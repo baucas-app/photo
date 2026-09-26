@@ -1,3 +1,4 @@
+import ActivityKit
 import BackgroundTasks
 import Foundation
 import Photos
@@ -11,6 +12,8 @@ final class BackupEngine: ObservableObject {
     @Published private(set) var status: Status = .idle
     @Published private(set) var totalCount = 0
     @Published private(set) var uploadedCount = 0
+
+    private var activity: Activity<BackupActivityAttributes>?
 
     enum Status: Equatable {
         case idle
@@ -74,6 +77,10 @@ final class BackupEngine: ObservableObject {
         totalCount = fetchResult.count
         uploadedCount = fetchResult.count - pending.count
 
+        if !pending.isEmpty {
+            startActivity()
+        }
+
         for asset in pending {
             do {
                 let fileURL = try await PhotoLibraryService.exportOriginal(asset)
@@ -84,12 +91,45 @@ final class BackupEngine: ObservableObject {
                 uploaded.insert(asset.localIdentifier)
                 uploadedIdentifiers = uploaded
                 uploadedCount += 1
+                await updateActivity()
             } catch {
                 status = .error(error.localizedDescription)
+                await endActivity()
                 return
             }
         }
 
         status = .idle
+        await endActivity()
+    }
+
+    // MARK: - Live Activity / Dynamic Island
+
+    private func startActivity() {
+        guard activity == nil, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let state = BackupActivityAttributes.ContentState(uploadedCount: uploadedCount, totalCount: totalCount)
+        activity = try? Activity.request(
+            attributes: BackupActivityAttributes(),
+            content: .init(state: state, staleDate: nil)
+        )
+    }
+
+    private func updateActivity() async {
+        // Activity<T>'s update/end run on a background executor and aren't
+        // marked Sendable, but Apple's own docs have them safe to call from
+        // any thread - same escape hatch as BGProcessingTask above.
+        guard let currentActivity = activity else { return }
+        nonisolated(unsafe) let unsafeActivity = currentActivity
+        let state = BackupActivityAttributes.ContentState(uploadedCount: uploadedCount, totalCount: totalCount)
+        await unsafeActivity.update(.init(state: state, staleDate: nil))
+    }
+
+    private func endActivity() async {
+        guard let currentActivity = activity else { return }
+        nonisolated(unsafe) let unsafeActivity = currentActivity
+        let state = BackupActivityAttributes.ContentState(uploadedCount: uploadedCount, totalCount: totalCount)
+        await unsafeActivity.end(.init(state: state, staleDate: nil), dismissalPolicy: .after(.now.addingTimeInterval(5)))
+        self.activity = nil
     }
 }

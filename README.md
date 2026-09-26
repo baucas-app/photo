@@ -60,6 +60,10 @@ Die App nutzt [Liquid Glass](https://developer.apple.com/design/human-interface-
 (iOS 26) gezielt für schwebende Steuerelemente (Viewer-Overlay, Floating-Action-Buttons); Tab-Bar,
 Navigation und Toolbars bekommen den Look automatisch vom System, da gegen das iOS-26-SDK gebaut wird.
 
+Das Xcode-Projekt hat ein zweites Target `PhotosWidgets` (Widget-Extension) für die Live Activity,
+die während eines Backups Fortschritt auf dem Sperrbildschirm und in der Dynamic Island zeigt -
+`BackupActivityAttributes.swift` liegt unter `Photos/Shared/` und wird in beide Targets kompiliert.
+
 ## Deployment auf der Synology NAS
 
 Jeder Push auf `main` baut über GitHub Actions (`.github/workflows/docker-images.yml`) alle vier
@@ -136,8 +140,7 @@ Lösch-Button pro Foto.
 
 - Web-UI: kein Drag&Drop-Upload, keine EXIF-Detailansicht im Viewer
 - iOS: `BackupEngine` läuft synchron über alle Assets (kein Delta-Sync via Server-Query, nur
-  lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s); Live-Activity/Dynamic-Island
-  für den Backup-Fortschritt ist noch nicht implementiert
+  lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s)
 - Album verschieben geht nur über einen Dropdown im "Verwalten"-Dialog (Web + iOS), noch nicht
   per Drag&Drop im Alben-Baum
 - Semantische Suche ist Brute-Force-Cosinus-Vergleich in Node (skaliert für eine Bibliothek,
