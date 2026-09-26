@@ -73,10 +73,12 @@ services:
       # Only meaningful if this compose file lives inside an actual git clone
       # (see README "Zwei Deploy-Varianten") - the admin panel's git-update
       # button runs `git pull` against this path. In the yaml-only/prebuilt-
-      # image deploy there's no .git here, so that one button just won't do
+      # image deploy there's no .git here, so `git pull` just won't do
       # anything useful; update via `docker compose pull && up -d` instead.
+      # (The button's `docker compose restart` half needs the docker CLI in
+      # a custom image plus the docker.sock mounted here - deliberately not
+      # wired up by default, see backend/Dockerfile.)
       - .:/repo
-      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "3001:3001"
     healthcheck:

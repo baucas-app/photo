@@ -17,18 +17,15 @@ FROM node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
-# libvips32 is needed by sharp at runtime. The docker CLI + compose plugin are
-# needed by /api/admin/git-update, which shells out to `docker compose
-# restart` on the host via the mounted docker socket (see docker-compose.yml).
+# libvips32 is needed by sharp at runtime, git by simple-git for the
+# admin git-update feature. The docker CLI itself (needed to actually run
+# `docker compose restart` from inside that endpoint) is deliberately not
+# installed here: pulling in Docker's third-party apt repo made the image
+# build fragile in CI, and the feature only applies to the source-clone
+# deploy path anyway (see README "Zwei Deploy-Varianten") - install it
+# yourself in a custom image if you need that button to work.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libvips32 ca-certificates curl gnupg git \
-    && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
-    && chmod a+r /etc/apt/keyrings/docker.asc \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" \
-       > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+    libvips32 ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules node_modules
