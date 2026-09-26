@@ -138,10 +138,11 @@ Lösch-Button pro Foto.
 
 ## Bekannte Lücken / nächste Schritte
 
-- Web-UI: kein Drag&Drop-Upload, keine EXIF-Detailansicht im Viewer
 - iOS: `BackupEngine` läuft synchron über alle Assets (kein Delta-Sync via Server-Query, nur
-  lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s)
-- Album verschieben geht nur über einen Dropdown im "Verwalten"-Dialog (Web + iOS), noch nicht
-  per Drag&Drop im Alben-Baum
+  lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s) - bei App-Neuinstallation
+  landen daher Re-Uploads als Duplikate, die über die Duplikate-Seite bereinigt werden können
 - Semantische Suche ist Brute-Force-Cosinus-Vergleich in Node (skaliert für eine Bibliothek,
   nicht für viele parallele Nutzer mit riesigen Bibliotheken - dafür später `pgvector` erwägen)
+- Album per Drag&Drop verschieben gibt es nur im Web (Alben-Baum zeigt die ganze Hierarchie auf
+  einmal); die iOS-Navigation zeigt Unteralben erst beim Reintippen, daher dort weiterhin über den
+  "Verwalten"-Dialog

@@ -36,7 +36,7 @@ export function AlbumsPage() {
         </button>
       </form>
       {error && <p className="error-text">{error}</p>}
-      <AlbumTree albums={albums} />
+      <AlbumTree albums={albums} onMoved={reload} />
       {albums.length === 0 && <p>Noch keine Alben vorhanden.</p>}
     </div>
   );
