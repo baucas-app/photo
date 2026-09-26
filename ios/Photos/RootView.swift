@@ -1,19 +1,32 @@
 import SwiftUI
 
+private enum SetupRoute: Hashable {
+    case login
+}
+
 struct RootView: View {
     @EnvironmentObject private var auth: AuthViewModel
-    @State private var serverConfigured = ServerConfig.baseURL != nil
+    // ServerSetupView is always the root of this stack; Login is pushed on
+    // top of it so the standard back button lets people return and change
+    // the server address - including on later launches, not just the first.
+    @State private var path: [SetupRoute] = ServerConfig.baseURL != nil ? [.login] : []
 
     var body: some View {
         Group {
-            if !serverConfigured {
-                ServerSetupView { serverConfigured = true }
-            } else if auth.isLoading {
+            if auth.isLoading {
                 ProgressView()
-            } else if auth.currentUser == nil {
-                LoginView()
-            } else {
+            } else if auth.currentUser != nil {
                 MainTabView()
+            } else {
+                NavigationStack(path: $path) {
+                    ServerSetupView { path = [.login] }
+                        .navigationDestination(for: SetupRoute.self) { route in
+                            switch route {
+                            case .login:
+                                LoginView()
+                            }
+                        }
+                }
             }
         }
         .task { await auth.bootstrap() }

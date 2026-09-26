@@ -8,26 +8,23 @@ struct LoginView: View {
     @State private var showRegister = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: Spacing.md) {
-                Spacer()
-                Text("Photos").font(.largeTitle.bold())
-
+        Form {
+            Section {
                 TextField("E-Mail", text: $email)
                     .textContentType(.username)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
 
                 SecureField("Passwort", text: $password)
                     .textContentType(.password)
-                    .textFieldStyle(.roundedBorder)
+            }
 
-                if let error = auth.errorMessage {
-                    Text(error).foregroundStyle(.red).font(.footnote)
-                }
+            if let error = auth.errorMessage {
+                Text(error).foregroundStyle(.red).font(.footnote)
+            }
 
+            Section {
                 Button {
                     Task {
                         isSubmitting = true
@@ -36,23 +33,21 @@ struct LoginView: View {
                     }
                 } label: {
                     if isSubmitting {
-                        ProgressView()
+                        ProgressView().frame(maxWidth: .infinity)
                     } else {
                         Text("Anmelden").frame(maxWidth: .infinity)
                     }
                 }
-                .buttonStyle(.borderedProminent)
 
                 Button("Noch keinen Account? Registrieren") { showRegister = true }
-                    .font(.footnote)
-
-                Spacer()
-                Spacer()
             }
-            .padding(Spacing.lg)
-            .sheet(isPresented: $showRegister) {
-                RegisterView()
-            }
+        }
+        // Same title mechanism (large navigation title) as ServerSetupView,
+        // so headings sit in the same spot across the setup/auth flow
+        // instead of each screen inventing its own layout for it.
+        .navigationTitle("Anmelden")
+        .sheet(isPresented: $showRegister) {
+            RegisterView()
         }
     }
 }
