@@ -114,6 +114,7 @@ Lösch-Button pro Foto.
 - iOS: `BackupEngine` läuft synchron über alle Assets (kein Delta-Sync via Server-Query, nur
   lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s); Live-Activity/Dynamic-Island
   für den Backup-Fortschritt ist noch nicht implementiert
-- Album-Umbenennung ändert nur den DB-Namen, nicht den Ordnerpfad/Unterordner-Migration
+- Ein Album per Drag&Drop in ein anderes verschieben (Parent ändern) gibt es noch nicht - nur
+  Umbenennen (verschiebt den echten Ordner inkl. aller Unterordner/Assets automatisch mit)
 - Semantische Suche ist Brute-Force-Cosinus-Vergleich in Node (skaliert für eine Bibliothek,
   nicht für viele parallele Nutzer mit riesigen Bibliotheken - dafür später `pgvector` erwägen)

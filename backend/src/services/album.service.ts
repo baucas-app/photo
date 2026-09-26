@@ -1,6 +1,6 @@
 import { prisma } from "../db/prisma.js";
 import { BadRequest, NotFound } from "../utils/httpError.js";
-import { ensureDir, removeEmptyDir } from "./filesystem.service.js";
+import { ensureDir, removeEmptyDir, renameEntry } from "./filesystem.service.js";
 
 export async function createAlbum(userId: string, name: string, parentId?: string) {
   let parentPath = "";
@@ -31,9 +31,65 @@ export async function updateAlbum(
   const album = await prisma.album.findFirst({ where: { id: albumId, userId } });
   if (!album) throw NotFound("Album not found");
 
-  // Renaming keeps the folder path stable; moving the underlying directory
-  // (and every descendant album's path) is a bigger operation left for later.
-  return prisma.album.update({ where: { id: album.id }, data });
+  if (data.name === undefined || data.name === album.name) {
+    return prisma.album.update({ where: { id: album.id }, data: { description: data.description } });
+  }
+
+  return renameAlbumFolder(userId, album, data.name, data.description);
+}
+
+/**
+ * The filesystem is the source of truth for files, so renaming an album
+ * moves its real directory (dragging every file and sub-album with it) and
+ * then fixes up every DB row whose `path` was cached under the old prefix -
+ * the album itself, every descendant album, and every asset nested anywhere
+ * inside it.
+ */
+async function renameAlbumFolder(
+  userId: string,
+  album: { id: string; path: string; parentId: string | null },
+  newName: string,
+  description: string | undefined,
+) {
+  let parentPath = "";
+  if (album.parentId) {
+    const parent = await prisma.album.findFirst({ where: { id: album.parentId, userId } });
+    parentPath = parent?.path ?? "";
+  }
+
+  const oldPath = album.path;
+  const newPath = `${parentPath}/${newName}`;
+
+  const conflict = await prisma.album.findFirst({ where: { userId, path: newPath } });
+  if (conflict) throw BadRequest("An album with this name already exists in this location");
+
+  await renameEntry(oldPath, newPath);
+
+  const [descendantAlbums, nestedAssets] = await Promise.all([
+    prisma.album.findMany({ where: { userId, path: { startsWith: `${oldPath}/` } } }),
+    prisma.asset.findMany({ where: { userId, path: { startsWith: `${oldPath}/` } } }),
+  ]);
+
+  await prisma.$transaction([
+    prisma.album.update({
+      where: { id: album.id },
+      data: { name: newName, path: newPath, description },
+    }),
+    ...descendantAlbums.map((descendant) =>
+      prisma.album.update({
+        where: { id: descendant.id },
+        data: { path: newPath + descendant.path.slice(oldPath.length) },
+      }),
+    ),
+    ...nestedAssets.map((asset) =>
+      prisma.asset.update({
+        where: { id: asset.id },
+        data: { path: newPath + asset.path.slice(oldPath.length) },
+      }),
+    ),
+  ]);
+
+  return prisma.album.findUniqueOrThrow({ where: { id: album.id } });
 }
 
 export async function deleteAlbum(userId: string, albumId: string): Promise<void> {
