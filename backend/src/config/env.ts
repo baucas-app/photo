@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { resolveSecret } from "./secrets.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -15,9 +16,9 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
 
-  jwtSecret: required("JWT_SECRET"),
+  jwtSecret: resolveSecret("JWT_SECRET", "jwt-secret"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "15m",
-  jwtRefreshSecret: required("JWT_REFRESH_SECRET"),
+  jwtRefreshSecret: resolveSecret("JWT_REFRESH_SECRET", "jwt-refresh-secret"),
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
 
   storageRoot: process.env.STORAGE_ROOT ?? "/photos",

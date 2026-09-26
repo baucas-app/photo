@@ -66,15 +66,17 @@ Images (`backend`, `frontend`, `backup-worker`, `ml-service`) und veröffentlich
 
 ### Variante A: Nur docker-compose.yml (empfohlen für den schnellen Test)
 
-Kein Git-Clone nötig - nur `docker-compose.yml` und `backend/.env.example` auf die NAS kopieren
-(z.B. per File Station), dann:
+Kein Git-Clone, keine `.env`-Datei nötig - nur `docker-compose.yml` auf die NAS kopieren
+(z.B. in Container Manager direkt einfügen), dann:
 
-1. `backend/.env` aus `backend/.env.example` erzeugen, **starke** `JWT_SECRET`/`JWT_REFRESH_SECRET` setzen.
-2. `docker-compose.yml` → `volumes.photos-library.driver_opts.device` auf den echten Fotoordner
-   der NAS anpassen (Default-Platzhalter: `/volume1/photos`).
-3. `docker compose up -d` (**ohne** `--build`) - Docker zieht die fertigen Images von GHCR statt
+1. `docker-compose.yml` → `volumes.photos-library.driver_opts.device` auf den echten Fotoordner
+   der NAS anpassen (Default-Platzhalter: `/volume1/photos`) - das ist der einzige Pflicht-Edit.
+2. `docker compose up -d` (**ohne** `--build`) - Docker zieht die fertigen Images von GHCR statt
    lokal zu bauen.
-4. Updates später: `docker compose pull && docker compose up -d`.
+3. Updates später: `docker compose pull && docker compose up -d`.
+
+JWT-Secrets werden beim ersten Start automatisch generiert und im `app-data`-Volume abgelegt -
+kein manuelles Anlegen nötig (siehe `backend/src/config/secrets.ts`).
 
 Einschränkung: Der "Update laden"-Button im Admin-Panel (git pull im Container) funktioniert hier
 nicht, da kein `.git`-Ordner gemountet ist - siehe Variante B, falls der gebraucht wird.
@@ -82,7 +84,8 @@ nicht, da kein `.git`-Ordner gemountet ist - siehe Variante B, falls der gebrauc
 ### Variante B: Vollständiger Git-Clone (für den Update-Button im Admin-Panel)
 
 1. Repo auf die NAS klonen, z.B. `git clone https://github.com/baucas-app/photo.git`.
-2. `backend/.env` + Fotoordner-Pfad wie in Variante A.
+2. Fotoordner-Pfad wie in Variante A anpassen. `backend/.env` ist optional (nur nötig, falls du
+   eigene, stabile JWT-Secrets statt der Auto-Generierung willst).
 3. `docker compose up -d --build` (baut lokal aus dem Quellcode statt die GHCR-Images zu ziehen).
 4. Das Admin-Panel kann danach per Knopfdruck `git pull` + Container-Neustart auslösen
    (`POST /api/admin/git-update`) - dafür ist der Docker-Socket in den Backend-Container gemountet.

@@ -58,17 +58,23 @@ services:
         condition: service_healthy
       ml-service:
         condition: service_started
-    env_file: backend/.env
     environment:
+      NODE_ENV: production
       DATABASE_URL: postgresql://photos:photos@postgres:5432/photos?schema=public
       REDIS_URL: redis://redis:6379
       ML_SERVICE_URL: http://ml-service:8000
       STORAGE_ROOT: /photos
       THUMBNAIL_CACHE_ROOT: /photos-cache
       GIT_REPO_PATH: /repo
+      # JWT_SECRET / JWT_REFRESH_SECRET are optional: if unset, the backend
+      # generates them on first boot and persists them in the app-data
+      # volume below, so no manual secret setup is needed for a plain
+      # `docker compose up -d`. Set them here explicitly only if you need a
+      # stable, portable secret (e.g. to share across multiple deployments).
     volumes:
       - photos-library:/photos
       - thumbnail-cache:/photos-cache
+      - app-data:/app-data
       # Only meaningful if this compose file lives inside an actual git clone
       # (see README "Zwei Deploy-Varianten") - the admin panel's git-update
       # button runs `git pull` against this path. In the yaml-only/prebuilt-
@@ -98,8 +104,8 @@ services:
         condition: service_healthy
       ml-service:
         condition: service_started
-    env_file: backend/.env
     environment:
+      NODE_ENV: production
       DATABASE_URL: postgresql://photos:photos@postgres:5432/photos?schema=public
       REDIS_URL: redis://redis:6379
       ML_SERVICE_URL: http://ml-service:8000
@@ -135,3 +141,4 @@ volumes:
       device: /volume1/photos
   thumbnail-cache:
   ml-models:
+  app-data:
