@@ -18,6 +18,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      # Without this, one failing image (e.g. ml-service) cancels the other
+      # three mid-build instead of letting them finish - which then hides
+      # their errors too and turns debugging into a slow one-at-a-time loop.
+      fail-fast: false
       matrix:
         include:
           - image: backend
