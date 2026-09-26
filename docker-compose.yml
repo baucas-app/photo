@@ -28,6 +28,7 @@ services:
     networks: [photos-internal]
 
   ml-service:
+    image: ghcr.io/baucas-app/photo-ml-service:latest
     build:
       context: ./ml-service
     restart: always
@@ -45,6 +46,7 @@ services:
     networks: [photos-internal]
 
   backend:
+    image: ghcr.io/baucas-app/photo-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -67,6 +69,11 @@ services:
     volumes:
       - photos-library:/photos
       - thumbnail-cache:/photos-cache
+      # Only meaningful if this compose file lives inside an actual git clone
+      # (see README "Zwei Deploy-Varianten") - the admin panel's git-update
+      # button runs `git pull` against this path. In the yaml-only/prebuilt-
+      # image deploy there's no .git here, so that one button just won't do
+      # anything useful; update via `docker compose pull && up -d` instead.
       - .:/repo
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
@@ -79,6 +86,7 @@ services:
     networks: [photos-internal]
 
   backup-worker:
+    image: ghcr.io/baucas-app/photo-backup-worker:latest
     build:
       context: .
       dockerfile: backup-worker/Dockerfile
@@ -101,6 +109,7 @@ services:
     networks: [photos-internal]
 
   frontend:
+    image: ghcr.io/baucas-app/photo-frontend:latest
     build:
       context: .
       dockerfile: frontend/Dockerfile

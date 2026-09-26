@@ -1,0 +1,53 @@
+name: Build and publish container images
+
+# Publishes every service as a prebuilt image to GHCR on every push to main,
+# so a NAS deployment only needs docker-compose.yml + .env - no cloned
+# source, no local build step. docker-compose.yml still keeps its `build:`
+# blocks too, so local dev can run `docker compose up --build` against
+# source changes instead of the published image.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: backend
+            context: .
+            dockerfile: backend/Dockerfile
+          - image: backup-worker
+            context: .
+            dockerfile: backup-worker/Dockerfile
+          - image: frontend
+            context: .
+            dockerfile: frontend/Dockerfile
+          - image: ml-service
+            context: ./ml-service
+            dockerfile: ml-service/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ghcr.io/${{ github.repository }}-${{ matrix.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
