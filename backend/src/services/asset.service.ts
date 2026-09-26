@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { prisma } from "../db/prisma.js";
 import { NotFound } from "../utils/httpError.js";
-import { extractImageMetadata } from "./exif.service.js";
+import { extractImageMetadata, type ExtractedMetadata } from "./exif.service.js";
 import { toAbsolutePath, ensureDir, deleteFile, removeEmptyDir } from "./filesystem.service.js";
 import { computePerceptualHash } from "./hash.service.js";
 import { enqueueMlPipeline } from "../queues/mlQueue.js";
@@ -31,9 +31,19 @@ async function uniqueRelativePath(dir: string, filename: string): Promise<string
 export async function ingestUploadedAsset(userId: string, file: UploadedFile, albumId?: string) {
   const isImage = file.mimeType.startsWith("image/");
 
-  const metadata = isImage
-    ? await extractImageMetadata(file.tempPath)
-    : { width: null, height: null, takenAt: null, cameraMake: null, cameraModel: null };
+  const emptyMetadata: ExtractedMetadata = {
+    width: null,
+    height: null,
+    takenAt: null,
+    cameraMake: null,
+    cameraModel: null,
+    lensModel: null,
+    iso: null,
+    fNumber: null,
+    exposureTime: null,
+    focalLength: null,
+  };
+  const metadata = isImage ? await extractImageMetadata(file.tempPath) : emptyMetadata;
 
   let targetDir: string;
   if (albumId) {
@@ -66,6 +76,11 @@ export async function ingestUploadedAsset(userId: string, file: UploadedFile, al
       takenAt: metadata.takenAt,
       cameraMake: metadata.cameraMake,
       cameraModel: metadata.cameraModel,
+      lensModel: metadata.lensModel,
+      iso: metadata.iso,
+      fNumber: metadata.fNumber,
+      exposureTime: metadata.exposureTime,
+      focalLength: metadata.focalLength,
       hash,
     },
   });

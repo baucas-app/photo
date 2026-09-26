@@ -63,6 +63,11 @@ model Asset {
   duration   Int?
   cameraMake  String?  @map("camera_make")
   cameraModel String?  @map("camera_model")
+  lensModel     String?  @map("lens_model")
+  iso           Int?
+  fNumber       Float?   @map("f_number")
+  exposureTime  Float?   @map("exposure_time")
+  focalLength   Float?   @map("focal_length")
   takenAt    DateTime? @map("taken_at")
   uploadedAt DateTime  @default(now()) @map("uploaded_at")
   hash       String?

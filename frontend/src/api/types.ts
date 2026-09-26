@@ -14,6 +14,13 @@ export interface Asset {
   width: number | null;
   height: number | null;
   duration: number | null;
+  cameraMake: string | null;
+  cameraModel: string | null;
+  lensModel: string | null;
+  iso: number | null;
+  fNumber: number | null;
+  exposureTime: number | null;
+  focalLength: number | null;
   takenAt: string | null;
   uploadedAt: string;
   isFavorite: boolean;

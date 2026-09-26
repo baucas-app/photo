@@ -11,6 +11,11 @@ struct Asset: Codable, Identifiable, Equatable, Hashable {
     let duration: Int?
     let cameraMake: String?
     let cameraModel: String?
+    let lensModel: String?
+    let iso: Int?
+    let fNumber: Double?
+    let exposureTime: Double?
+    let focalLength: Double?
     let takenAt: Date?
     let uploadedAt: Date
     let isFavorite: Bool

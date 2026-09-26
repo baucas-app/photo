@@ -7,11 +7,36 @@ export interface ExtractedMetadata {
   takenAt: Date | null;
   cameraMake: string | null;
   cameraModel: string | null;
+  lensModel: string | null;
+  iso: number | null;
+  fNumber: number | null;
+  exposureTime: number | null;
+  focalLength: number | null;
+}
+
+const EXIF_FIELDS = [
+  "DateTimeOriginal",
+  "CreateDate",
+  "Make",
+  "Model",
+  "LensModel",
+  "ISO",
+  "FNumber",
+  "ExposureTime",
+  "FocalLength",
+] as const;
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value.trim() : null;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export async function extractImageMetadata(absolutePath: string): Promise<ExtractedMetadata> {
   const [exif, image] = await Promise.all([
-    exifr.parse(absolutePath, { pick: ["DateTimeOriginal", "CreateDate", "Make", "Model"] }).catch(() => null),
+    exifr.parse(absolutePath, { pick: [...EXIF_FIELDS] }).catch(() => null),
     sharp(absolutePath).metadata().catch(() => null),
   ]);
 
@@ -21,7 +46,12 @@ export async function extractImageMetadata(absolutePath: string): Promise<Extrac
     width: image?.width ?? null,
     height: image?.height ?? null,
     takenAt: takenAt instanceof Date ? takenAt : null,
-    cameraMake: typeof exif?.Make === "string" ? exif.Make.trim() : null,
-    cameraModel: typeof exif?.Model === "string" ? exif.Model.trim() : null,
+    cameraMake: toStringOrNull(exif?.Make),
+    cameraModel: toStringOrNull(exif?.Model),
+    lensModel: toStringOrNull(exif?.LensModel),
+    iso: toNumberOrNull(exif?.ISO),
+    fNumber: toNumberOrNull(exif?.FNumber),
+    exposureTime: toNumberOrNull(exif?.ExposureTime),
+    focalLength: toNumberOrNull(exif?.FocalLength),
   };
 }

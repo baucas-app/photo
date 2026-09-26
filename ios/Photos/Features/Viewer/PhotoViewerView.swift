@@ -43,6 +43,9 @@ struct PhotoViewerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(currentAsset.filename).font(.footnote.bold())
                             Text(metadataLine).font(.caption).foregroundStyle(.secondary)
+                            if !exifLine.isEmpty {
+                                Text(exifLine).font(.caption2).foregroundStyle(.tertiary)
+                            }
                         }
                         Spacer()
                     }
@@ -64,9 +67,21 @@ struct PhotoViewerView: View {
         if let width = currentAsset.width, let height = currentAsset.height {
             parts.append("\(width)×\(height)")
         }
+        return parts.joined(separator: " · ")
+    }
+
+    private var exifLine: String {
+        var parts: [String] = []
         if let model = currentAsset.cameraModel {
-            parts.append(model)
+            parts.append([currentAsset.cameraMake, model].compactMap { $0 }.joined(separator: " "))
         }
+        if let lens = currentAsset.lensModel { parts.append(lens) }
+        if let focalLength = currentAsset.focalLength { parts.append("\(Int(focalLength))mm") }
+        if let fNumber = currentAsset.fNumber { parts.append("f/\(fNumber)") }
+        if let exposureTime = currentAsset.exposureTime {
+            parts.append(exposureTime >= 1 ? "\(exposureTime)s" : "1/\(Int((1 / exposureTime).rounded()))s")
+        }
+        if let iso = currentAsset.iso { parts.append("ISO \(iso)") }
         return parts.joined(separator: " · ")
     }
 
