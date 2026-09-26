@@ -1,6 +1,6 @@
 # Photos
 
-Eigenständiges, selbstgehostetes Fotoverwaltungssystem für die Synology NAS (DS1621+) - Apple-Photos-ähnliche Erfahrung mit lokaler KI (CLIP-Suche, YOLO-Tagging, Gesichtserkennung), ohne Cloud-Abhängigkeit und ohne Immich.
+Eigenständiges, selbstgehostetes Fotoverwaltungssystem für die Synology NAS (DS1621+) - Apple-Photos-ähnliche Erfahrung mit lokaler KI (CLIP-Suche, YOLO-Tagging, Gesichtserkennung), ohne Cloud-Abhängigkeit.
 
 ## Architektur
 

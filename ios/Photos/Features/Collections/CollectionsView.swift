@@ -20,7 +20,7 @@ enum SmartCollection: String, CaseIterable, Identifiable {
     }
 }
 
-/// Auto-detected buckets like Immich's "Videos"/"Screenshots" smart albums.
+/// Auto-detected buckets, e.g. "Videos"/"Screenshots" smart albums.
 /// Screenshots are detected by filename convention since the backend doesn't
 /// track PHAssetMediaSubtype (that's an on-device-only concept) - "IMG_" vs
 /// "Screenshot" is what iOS itself names them.

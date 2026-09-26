@@ -1,8 +1,8 @@
 import UIKit
 
 /// Two-tier thumbnail cache (memory + disk) so the timeline stays scrollable
-/// offline, the way Immich's app caches thumbnails locally. Keyed by the
-/// asset id, not the full URL, since the API key query param can rotate.
+/// offline. Keyed by the asset id, not the full URL, since the API key
+/// query param can rotate.
 actor ImageCache {
     static let shared = ImageCache()
 
