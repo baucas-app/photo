@@ -6,6 +6,7 @@ struct AlbumDetailView: View {
 
     @State private var detail: AlbumDetail?
     @State private var selectedAsset: Asset?
+    @State private var showManage = false
 
     private let columns = [GridItem(.adaptive(minimum: 110), spacing: 2)]
 
@@ -39,9 +40,20 @@ struct AlbumDetailView: View {
             }
         }
         .navigationTitle(album.name)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Verwalten") { showManage = true }
+            }
+        }
         .task { await load() }
         .fullScreenCover(item: $selectedAsset) { asset in
             PhotoViewerView(assets: detail?.assets ?? [], initialAsset: asset)
+        }
+        .sheet(isPresented: $showManage) {
+            AlbumManageSheet(album: album) {
+                await viewModel.load()
+                await load()
+            }
         }
         .overlay {
             if let detail, detail.assets.isEmpty, detail.children.isEmpty {
@@ -52,5 +64,78 @@ struct AlbumDetailView: View {
 
     private func load() async {
         detail = try? await APIClient.shared.request("/albums/\(album.id)")
+    }
+}
+
+/// Rename and/or move an album to a different parent - both cause the
+/// backend to move the real folder, so this hits the same PUT endpoint
+/// with whichever fields changed.
+private struct AlbumManageSheet: View {
+    let album: Album
+    let onSaved: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var parentId: String?
+    @State private var allAlbums: [Album] = []
+    @State private var errorMessage: String?
+    @State private var isSaving = false
+
+    init(album: Album, onSaved: @escaping () async -> Void) {
+        self.album = album
+        self.onSaved = onSaved
+        _name = State(initialValue: album.name)
+        _parentId = State(initialValue: album.parentId)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("Name", text: $name)
+                }
+                Section("Übergeordnetes Album") {
+                    Picker("Übergeordnetes Album", selection: $parentId) {
+                        Text("(keins)").tag(String?.none)
+                        ForEach(allAlbums.filter { $0.id != album.id }) { candidate in
+                            Text(candidate.path).tag(String?.some(candidate.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.inline)
+                }
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red).font(.footnote)
+                }
+            }
+            .navigationTitle("Album verwalten")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Abbrechen") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Speichern") { Task { await save() } }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                }
+            }
+            .task {
+                allAlbums = (try? await APIClient.shared.request("/albums")) ?? []
+            }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        struct Body: Encodable { let name: String; let parentId: String? }
+        do {
+            let _: Album = try await APIClient.shared.request(
+                "/albums/\(album.id)", method: "PUT", body: Body(name: name, parentId: parentId)
+            )
+            await onSaved()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

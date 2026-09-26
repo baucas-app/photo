@@ -26,44 +26,57 @@ export async function createAlbum(userId: string, name: string, parentId?: strin
 export async function updateAlbum(
   userId: string,
   albumId: string,
-  data: { name?: string; description?: string },
+  data: { name?: string; description?: string; parentId?: string | null },
 ) {
   const album = await prisma.album.findFirst({ where: { id: albumId, userId } });
   if (!album) throw NotFound("Album not found");
 
-  if (data.name === undefined || data.name === album.name) {
+  const newName = data.name ?? album.name;
+  const newParentId = data.parentId !== undefined ? data.parentId : album.parentId;
+
+  if (newName === album.name && newParentId === album.parentId) {
     return prisma.album.update({ where: { id: album.id }, data: { description: data.description } });
   }
 
-  return renameAlbumFolder(userId, album, data.name, data.description);
+  return moveAlbumFolder(userId, album, newName, newParentId, data.description);
 }
 
 /**
- * The filesystem is the source of truth for files, so renaming an album
- * moves its real directory (dragging every file and sub-album with it) and
- * then fixes up every DB row whose `path` was cached under the old prefix -
- * the album itself, every descendant album, and every asset nested anywhere
- * inside it.
+ * The filesystem is the source of truth for files, so renaming or
+ * reparenting an album moves its real directory (dragging every file and
+ * sub-album with it) and then fixes up every DB row whose `path` was cached
+ * under the old prefix - the album itself, every descendant album, and every
+ * asset nested anywhere inside it.
  */
-async function renameAlbumFolder(
+async function moveAlbumFolder(
   userId: string,
   album: { id: string; path: string; parentId: string | null },
   newName: string,
+  newParentId: string | null,
   description: string | undefined,
 ) {
-  let parentPath = "";
-  if (album.parentId) {
-    const parent = await prisma.album.findFirst({ where: { id: album.parentId, userId } });
-    parentPath = parent?.path ?? "";
+  let newParentPath = "";
+  if (newParentId) {
+    if (newParentId === album.id) {
+      throw BadRequest("An album can't be moved into itself");
+    }
+    const newParent = await prisma.album.findFirst({ where: { id: newParentId, userId } });
+    if (!newParent) throw NotFound("Target parent album not found");
+    if (newParent.path === album.path || newParent.path.startsWith(`${album.path}/`)) {
+      throw BadRequest("An album can't be moved into one of its own sub-albums");
+    }
+    newParentPath = newParent.path;
   }
 
   const oldPath = album.path;
-  const newPath = `${parentPath}/${newName}`;
+  const newPath = `${newParentPath}/${newName}`;
 
-  const conflict = await prisma.album.findFirst({ where: { userId, path: newPath } });
-  if (conflict) throw BadRequest("An album with this name already exists in this location");
+  if (newPath !== oldPath) {
+    const conflict = await prisma.album.findFirst({ where: { userId, path: newPath } });
+    if (conflict) throw BadRequest("An album with this name already exists in this location");
 
-  await renameEntry(oldPath, newPath);
+    await renameEntry(oldPath, newPath);
+  }
 
   const [descendantAlbums, nestedAssets] = await Promise.all([
     prisma.album.findMany({ where: { userId, path: { startsWith: `${oldPath}/` } } }),
@@ -73,7 +86,7 @@ async function renameAlbumFolder(
   await prisma.$transaction([
     prisma.album.update({
       where: { id: album.id },
-      data: { name: newName, path: newPath, description },
+      data: { name: newName, path: newPath, parentId: newParentId, description },
     }),
     ...descendantAlbums.map((descendant) =>
       prisma.album.update({

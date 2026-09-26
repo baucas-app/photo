@@ -64,6 +64,7 @@ albumsRouter.get("/:id", async (req, res) => {
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 albumsRouter.put("/:id", async (req, res) => {
