@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
 import { BadRequest, NotFound } from "../utils/httpError.js";
 import { deleteAsset, ingestUploadedAsset } from "../services/asset.service.js";
+import { findDuplicates } from "../services/duplicate.service.js";
 import { toAbsolutePath } from "../services/filesystem.service.js";
 import { getOrCreateThumbnail } from "../services/thumbnail.service.js";
 
@@ -40,6 +41,13 @@ assetsRouter.get("/", async (req, res) => {
     assets,
     nextCursor: assets.length === query.limit ? assets.at(-1)?.id ?? null : null,
   });
+});
+
+// Must come before "/:id" - otherwise Express would try to look up an
+// asset literally named "duplicates".
+assetsRouter.get("/duplicates", async (req, res) => {
+  const groups = await findDuplicates(req.user!.sub);
+  res.json({ groups });
 });
 
 assetsRouter.get("/:id", async (req, res) => {

@@ -13,6 +13,7 @@ export function Layout() {
         </NavLink>
         <NavLink to="/albums">Alben</NavLink>
         <NavLink to="/search">Suche</NavLink>
+        <NavLink to="/duplicates">Duplikate</NavLink>
         <NavLink to="/faces">Personen</NavLink>
         <NavLink to="/sharing">Freigaben</NavLink>
         <NavLink to="/settings">Einstellungen</NavLink>

@@ -29,7 +29,10 @@ struct TimelineView: View {
             .navigationTitle("Mediathek")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(destination: CollectionsView()) {
+                    Menu {
+                        NavigationLink("Sammlungen", destination: CollectionsView())
+                        NavigationLink("Duplikate", destination: DuplicatesView())
+                    } label: {
                         Image(systemName: "square.stack.3d.up")
                     }
                 }

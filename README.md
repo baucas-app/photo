@@ -100,14 +100,20 @@ DS1621+. `yolov8n` (nano) ist als Default-Modell bewusst klein gewählt.
 sich anklicken, um direkt danach zu filtern (`GET /api/assets?cameraModel=...`).
 `GET /api/stats/overview` liefert Gesamtzahlen (Assets, Favoriten, Videos, pro Jahr).
 
+## Duplikate
+
+`GET /api/assets/duplicates` gruppiert die eigene Bibliothek per Perceptual-Hash-Vergleich
+(Hamming-Distanz ≤ 6 auf dem 64-bit aHash) in Near-Duplicate-Cluster - erkennt auch unterschiedlich
+komprimierte/skalierte Kopien desselben Fotos, nicht nur byteidentische Dateien. UI in Web
+(`/duplicates`) und iOS (Menü in der Mediathek-Toolbar) zeigt die Cluster nebeneinander mit
+Lösch-Button pro Foto.
+
 ## Bekannte Lücken / nächste Schritte
 
-- Web-UI: kein Drag&Drop-Upload, keine EXIF-Detailansicht im Viewer, kein Duplikat-Screen
+- Web-UI: kein Drag&Drop-Upload, keine EXIF-Detailansicht im Viewer
 - iOS: `BackupEngine` läuft synchron über alle Assets (kein Delta-Sync via Server-Query, nur
   lokale UserDefaults-Liste bereits hochgeladener `localIdentifier`s); Live-Activity/Dynamic-Island
   für den Backup-Fortschritt ist noch nicht implementiert
-- Duplikat-Ansicht (Perceptual-Hash-Vergleich existiert serverseitig als `hash`-Spalte + 
-  `hammingDistance()`-Helper, aber es gibt noch keinen `/api/duplicates`-Endpoint/UI)
 - Album-Umbenennung ändert nur den DB-Namen, nicht den Ordnerpfad/Unterordner-Migration
 - Semantische Suche ist Brute-Force-Cosinus-Vergleich in Node (skaliert für eine Bibliothek,
   nicht für viele parallele Nutzer mit riesigen Bibliotheken - dafür später `pgvector` erwägen)

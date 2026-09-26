@@ -8,6 +8,7 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { AlbumsPage } from "./pages/AlbumsPage";
 import { AlbumDetailPage } from "./pages/AlbumDetailPage";
 import { SearchPage } from "./pages/SearchPage";
+import { DuplicatesPage } from "./pages/DuplicatesPage";
 import { FacesPage } from "./pages/FacesPage";
 import { FaceDetailPage } from "./pages/FaceDetailPage";
 import { SharingPage } from "./pages/SharingPage";
@@ -32,6 +33,7 @@ export function App() {
               <Route path="/albums" element={<AlbumsPage />} />
               <Route path="/albums/:id" element={<AlbumDetailPage />} />
               <Route path="/search" element={<SearchPage />} />
+              <Route path="/duplicates" element={<DuplicatesPage />} />
               <Route path="/faces" element={<FacesPage />} />
               <Route path="/faces/:id" element={<FaceDetailPage />} />
               <Route path="/sharing" element={<SharingPage />} />

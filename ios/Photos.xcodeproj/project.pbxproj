@@ -33,6 +33,7 @@
 		9936FD351FECB2D84C6F5E44 /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 843300365E51977714CBB808 /* ServerSetupView.swift */; };
 		A2010E362543F9C4E0FA2D07 /* GlassOverlayBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD152FE9CB5B9A24FEE7CC79 /* GlassOverlayBar.swift */; };
 		B67435E4F3908859B4D1F21E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 53E761C3ACBF061BBAC83721 /* Assets.xcassets */; };
+		BA9525CB20006E2F46F45F5C /* DuplicatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFEE40CF36B2F45CDAF105BF /* DuplicatesView.swift */; };
 		D1820AE2F04190DE39A23B8A /* Face.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D49122D071B73376D592E3 /* Face.swift */; };
 		DC3C73D741E00D5B9D6F205F /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BC4CF22E2AA1B34BCBCE07 /* App.swift */; };
 		E78DBA5AFF293615431F0AD4 /* RegisterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7344C46928F3DEC0FDF0E0CA /* RegisterView.swift */; };
@@ -86,6 +87,7 @@
 		FD005F29F8D9F91C8CDAF7C8 /* FaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceDetailView.swift; sourceTree = "<group>"; };
 		FD152FE9CB5B9A24FEE7CC79 /* GlassOverlayBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOverlayBar.swift; sourceTree = "<group>"; };
 		FFBA7CF7FC0725B90D667039 /* PhotoLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryService.swift; sourceTree = "<group>"; };
+		FFEE40CF36B2F45CDAF105BF /* DuplicatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicatesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -136,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				9ACF976503F347D9590A529A /* CollectionsView.swift */,
+				FFEE40CF36B2F45CDAF105BF /* DuplicatesView.swift */,
 			);
 			path = Collections;
 			sourceTree = "<group>";
@@ -342,6 +345,7 @@
 				2FA70023077D544638FE18CE /* BackupStatusView.swift in Sources */,
 				261213B5DA1A54FA340D0772 /* CachedThumbnail.swift in Sources */,
 				0F5799FE840E89DF100BD70D /* CollectionsView.swift in Sources */,
+				BA9525CB20006E2F46F45F5C /* DuplicatesView.swift in Sources */,
 				D1820AE2F04190DE39A23B8A /* Face.swift in Sources */,
 				5F5345FB15856F087FEBDA56 /* FaceDetailView.swift in Sources */,
 				6526774AEBBA2D1DF9110ECF /* FacesView.swift in Sources */,
