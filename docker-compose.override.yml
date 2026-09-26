@@ -1,0 +1,24 @@
+# Compose auto-merges this file with docker-compose.yml whenever both sit
+# in the same directory (no -f flags needed) - so a real git checkout still
+# builds from source with a plain `docker compose up --build`, while a
+# yaml-only NAS deploy (docker-compose.yml alone, no checkout) has no
+# build: keys to fail on and just pulls the published GHCR images instead.
+services:
+  ml-service:
+    build:
+      context: ./ml-service
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+  backup-worker:
+    build:
+      context: .
+      dockerfile: backup-worker/Dockerfile
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile

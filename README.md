@@ -12,7 +12,9 @@ backup-worker/      Background-Worker (BullMQ): führt die ML-Pipeline pro Foto 
 ml-service/         Python/FastAPI: CLIP-Embeddings, YOLO-Tagging, Gesichtserkennung
 packages/database/  Gemeinsamer Prisma-Client (von backend + backup-worker genutzt)
 packages/shared/    Gemeinsame TS-Utilities (Vektor-Mathe, ml-service-HTTP-Client, Job-Typen)
-docker-compose.yml  Alle Services für den NAS-Betrieb
+docker-compose.yml           Alle Services, referenziert nur die veröffentlichten ghcr.io-Images
+docker-compose.override.yml  Ergänzt build:-Blöcke - wird von Compose automatisch mitgeladen,
+                              wenn beide Dateien nebeneinander liegen (echter Git-Checkout)
 ```
 
 Das Dateisystem unter `STORAGE_ROOT` (`/photos` im Container) ist die Wahrheit für Dateien;

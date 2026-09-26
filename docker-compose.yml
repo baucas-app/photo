@@ -29,8 +29,6 @@ services:
 
   ml-service:
     image: ghcr.io/baucas-app/photo-ml-service:latest
-    build:
-      context: ./ml-service
     restart: always
     environment:
       STORAGE_ROOT: /photos
@@ -47,9 +45,6 @@ services:
 
   backend:
     image: ghcr.io/baucas-app/photo-backend:latest
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
     restart: always
     depends_on:
       postgres:
@@ -93,9 +88,6 @@ services:
 
   backup-worker:
     image: ghcr.io/baucas-app/photo-backup-worker:latest
-    build:
-      context: .
-      dockerfile: backup-worker/Dockerfile
     restart: always
     depends_on:
       postgres:
@@ -116,9 +108,6 @@ services:
 
   frontend:
     image: ghcr.io/baucas-app/photo-frontend:latest
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
     restart: always
     depends_on:
       - backend
