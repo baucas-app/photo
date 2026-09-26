@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum TagSource {
+  user
+  yolo
+  clip
+}
+
+enum BackupJobStatus {
+  idle
+  running
+  paused
+  error
+}
+
+enum ShareRole {
+  owner
+  editor
+  viewer
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  role         Role     @default(user)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  assets        Asset[]
+  albums        Album[]
+  faces         Face[]
+  sharedLinks   SharedLink[]
+  sharedMembers SharedMember[]
+  backupStatus  BackupStatus?
+  apiKeys       ApiKey[]
+
+  @@map("users")
+}
+
+model Asset {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  filename   String
+  path       String
+  size       Int?
+  mimeType   String?   @map("mime_type")
+  width      Int?
+  height     Int?
+  duration   Int?
+  cameraMake  String?  @map("camera_make")
+  cameraModel String?  @map("camera_model")
+  takenAt    DateTime? @map("taken_at")
+  uploadedAt DateTime  @default(now()) @map("uploaded_at")
+  hash       String?
+  isFavorite Boolean   @default(false) @map("is_favorite")
+  isArchived Boolean   @default(false) @map("is_archived")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  albumAssets    AlbumAsset[]
+  tags           Tag[]
+  faceDetections FaceDetection[]
+  coverOfAlbums  Album[]         @relation("AlbumCover")
+  sampleOfFaces  Face[]          @relation("FaceSample")
+  embedding      AssetEmbedding?
+
+  @@index([userId])
+  @@index([takenAt])
+  @@index([hash])
+  @@map("assets")
+}
+
+/// CLIP embedding for semantic search, computed once at upload time and cached
+/// here so search requests never re-run the model. Not in the original spec's
+/// table list because that list only covered tags/faces - semantic search needs
+/// a vector per asset, not per tag.
+model AssetEmbedding {
+  id        String   @id @default(uuid())
+  assetId   String   @unique @map("asset_id")
+  vector    Bytes
+  model     String   @default("clip-vit-b-32")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_embeddings")
+}
+
+model Album {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  name          String
+  description   String?
+  path          String
+  parentId      String?  @map("parent_id")
+  coverAssetId  String?  @map("cover_asset_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        Album?         @relation("AlbumTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Album[]        @relation("AlbumTree")
+  coverAsset    Asset?         @relation("AlbumCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  albumAssets   AlbumAsset[]
+  sharedLink    SharedLink?
+  sharedMembers SharedMember[]
+
+  @@unique([userId, path])
+  @@index([parentId])
+  @@map("albums")
+}
+
+model AlbumAsset {
+  id        String   @id @default(uuid())
+  albumId   String   @map("album_id")
+  assetId   String   @map("asset_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, assetId])
+  @@map("album_assets")
+}
+
+model Tag {
+  id         String    @id @default(uuid())
+  assetId    String    @map("asset_id")
+  label      String
+  confidence Float?
+  source     TagSource
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([label])
+  @@index([assetId])
+  @@map("tags")
+}
+
+model Face {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  embedding      Bytes
+  sampleAssetId  String?  @map("sample_asset_id")
+  personName     String?  @map("person_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sampleAsset    Asset?          @relation("FaceSample", fields: [sampleAssetId], references: [id], onDelete: SetNull)
+  faceDetections FaceDetection[]
+
+  @@index([userId])
+  @@map("faces")
+}
+
+model FaceDetection {
+  id         String   @id @default(uuid())
+  assetId    String   @map("asset_id")
+  faceId     String?  @map("face_id")
+  x          Float
+  y          Float
+  w          Float
+  h          Float
+  confidence Float?
+  detectedAt DateTime @default(now()) @map("detected_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  face  Face? @relation(fields: [faceId], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+  @@index([faceId])
+  @@map("face_detections")
+}
+
+model SharedLink {
+  id           String    @id @default(uuid())
+  albumId      String    @unique @map("album_id")
+  token        String    @unique
+  passwordHash String?   @map("password_hash")
+  expiresAt    DateTime? @map("expires_at")
+  createdBy    String    @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  album   Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  creator User  @relation(fields: [createdBy], references: [id])
+
+  @@map("shared_links")
+}
+
+model SharedMember {
+  id        String    @id @default(uuid())
+  albumId   String    @map("album_id")
+  userId    String    @map("user_id")
+  role      ShareRole @default(viewer)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, userId])
+  @@map("shared_members")
+}
+
+/// Long-lived per-user key for authenticating plain GET requests (query
+/// param or header) - unlike the short-lived JWT access token, this is what
+/// lets <img src="...?apiKey=..."> or an external tool load a thumbnail
+/// directly, without a JS fetch-and-blob dance to attach an Authorization header.
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String    @default("Default")
+  keyHash    String    @unique @map("key_hash")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+model BackupStatus {
+  id              String          @id @default(uuid())
+  userId          String          @unique @map("user_id")
+  lastBackup      DateTime?       @map("last_backup")
+  totalAssets     Int             @default(0) @map("total_assets")
+  backedUpAssets  Int             @default(0) @map("backed_up_assets")
+  status          BackupJobStatus @default(idle)
+  errorMessage    String?         @map("error_message")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("backup_status")
+}

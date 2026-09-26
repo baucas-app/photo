@@ -1,0 +1,41 @@
+.DS_Store
+
+# Node
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+npm-debug.log*
+
+# Prisma
+backend/prisma/*.db
+
+# Frontend
+frontend/dist/
+frontend/.vite/
+
+# ML service
+ml-service/__pycache__/
+ml-service/**/__pycache__/
+ml-service/.venv/
+ml-service/*.pt
+ml-service/*.onnx
+ml-service/models/
+
+# iOS / Xcode
+ios/**/xcuserdata/
+ios/**/.DS_Store
+ios/**/*.xcworkspace/xcuserdata/
+ios/build/
+ios/DerivedData/
+
+# Uploads / local data (never commit real photos)
+uploads/
+data/postgres/
+data/redis/
+
+# Editor
+.vscode/
+.idea/

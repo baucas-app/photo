@@ -1,0 +1,24 @@
+{
+  "name": "photos",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "backup-worker",
+    "frontend"
+  ],
+  "scripts": {
+    "prisma:generate": "npm run generate -w @photos/database",
+    "build:shared": "npm run build -w @photos/shared",
+    "build:database": "npm run prisma:generate && npm run build -w @photos/database",
+    "build:backend": "npm run build -w photos-backend",
+    "build:worker": "npm run build -w photos-backup-worker",
+    "build:frontend": "npm run build -w photos-frontend",
+    "build": "npm run build:shared && npm run build:database && npm run build:backend && npm run build:worker && npm run build:frontend",
+    "dev:backend": "npm run dev -w photos-backend",
+    "dev:worker": "npm run dev -w photos-backup-worker",
+    "dev:frontend": "npm run dev -w photos-frontend",
+    "prisma:migrate:dev": "npm run migrate:dev -w @photos/database"
+  }
+}

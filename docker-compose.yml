@@ -1,0 +1,128 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: photos
+      POSTGRES_PASSWORD: photos
+      POSTGRES_DB: photos
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U photos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [photos-internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [photos-internal]
+
+  ml-service:
+    build:
+      context: ./ml-service
+    restart: always
+    environment:
+      STORAGE_ROOT: /photos
+    volumes:
+      - photos-library:/photos:ro
+      - ml-models:/root/.cache
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks: [photos-internal]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql://photos:photos@postgres:5432/photos?schema=public
+      REDIS_URL: redis://redis:6379
+      ML_SERVICE_URL: http://ml-service:8000
+      STORAGE_ROOT: /photos
+      THUMBNAIL_CACHE_ROOT: /photos-cache
+      GIT_REPO_PATH: /repo
+    volumes:
+      - photos-library:/photos
+      - thumbnail-cache:/photos-cache
+      - .:/repo
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [photos-internal]
+
+  backup-worker:
+    build:
+      context: .
+      dockerfile: backup-worker/Dockerfile
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql://photos:photos@postgres:5432/photos?schema=public
+      REDIS_URL: redis://redis:6379
+      ML_SERVICE_URL: http://ml-service:8000
+      STORAGE_ROOT: /photos
+    volumes:
+      - photos-library:/photos
+    networks: [photos-internal]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks: [photos-internal]
+
+networks:
+  photos-internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  photos-library:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume1/photos
+  thumbnail-cache:
+  ml-models:
