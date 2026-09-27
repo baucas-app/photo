@@ -34,7 +34,9 @@ COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages packages
 COPY --from=build /app/backend/dist backend/dist
 COPY --from=build /app/backend/package.json backend/package.json
+COPY backend/docker-entrypoint.sh docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
 
 WORKDIR /app/backend
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

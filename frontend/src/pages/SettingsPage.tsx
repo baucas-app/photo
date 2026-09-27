@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
-import { apiJson } from "../api/client";
+import { apiJson, ApiError } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
+
+interface HealthStatus {
+  status: string;
+  database: "ok" | "unreachable";
+}
 
 interface ApiKeyInfo {
   id: string;
@@ -22,11 +27,26 @@ export function SettingsPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [keyName, setKeyName] = useState("");
   const [newKey, setNewKey] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthStatus | "unreachable" | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   const reloadKeys = () => apiJson<ApiKeyInfo[]>("/auth/api-keys").then(setApiKeys);
 
+  async function checkHealth() {
+    const start = performance.now();
+    try {
+      const result = await apiJson<HealthStatus>("/health");
+      setLatencyMs(Math.round(performance.now() - start));
+      setHealth(result);
+    } catch (err) {
+      setHealth(err instanceof ApiError ? { status: "error", database: "unreachable" } : "unreachable");
+      setLatencyMs(null);
+    }
+  }
+
   useEffect(() => {
     void reloadKeys();
+    void checkHealth();
     apiJson<Overview>("/stats/overview").then(setOverview);
   }, []);
 
@@ -57,6 +77,32 @@ export function SettingsPage() {
         <button className="btn secondary" onClick={logout}>
           Abmelden
         </button>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 className="day-heading">Server-Status</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              display: "inline-block",
+              background:
+                health && health !== "unreachable" && health.database === "ok" ? "#34c759" : "var(--color-danger)",
+            }}
+          />
+          <span style={{ fontSize: 14 }}>
+            {health === null
+              ? "Prüfe…"
+              : health === "unreachable" || health.database !== "ok"
+                ? "Server nicht erreichbar"
+                : `Online${latencyMs !== null ? ` · ${latencyMs} ms` : ""}`}
+          </span>
+          <button className="btn secondary" style={{ marginLeft: "auto" }} onClick={checkHealth}>
+            Neu prüfen
+          </button>
+        </div>
       </section>
 
       {overview && (

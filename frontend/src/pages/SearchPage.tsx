@@ -9,6 +9,11 @@ interface CameraStat {
   count: number;
 }
 
+interface TagStat {
+  label: string;
+  count: number;
+}
+
 interface SearchResult {
   asset: Asset;
   score: number;
@@ -19,9 +24,11 @@ export function SearchPage() {
   const [results, setResults] = useState<Asset[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [cameraStats, setCameraStats] = useState<CameraStat[]>([]);
+  const [tagStats, setTagStats] = useState<TagStat[]>([]);
 
   useEffect(() => {
     apiJson<CameraStat[]>("/stats/cameras").then(setCameraStats);
+    apiJson<TagStat[]>("/tags").then(setTagStats);
   }, []);
 
   async function runSearch(q: string) {
@@ -38,10 +45,18 @@ export function SearchPage() {
 
   async function filterByCamera(model: string | null) {
     if (!model) return;
+    await filterByAssetsQuery(model, `cameraModel=${encodeURIComponent(model)}`);
+  }
+
+  async function filterByTag(label: string) {
+    await filterByAssetsQuery(label, `tag=${encodeURIComponent(label)}`);
+  }
+
+  async function filterByAssetsQuery(displayLabel: string, queryString: string) {
     setLoading(true);
-    setQuery(model);
+    setQuery(displayLabel);
     try {
-      const data = await apiJson<{ assets: Asset[] }>(`/assets?cameraModel=${encodeURIComponent(model)}`);
+      const data = await apiJson<{ assets: Asset[] }>(`/assets?${queryString}`);
       setResults(data.assets);
     } finally {
       setLoading(false);
@@ -67,6 +82,24 @@ export function SearchPage() {
           {loading ? "Suche…" : "Suchen"}
         </button>
       </form>
+
+      {tagStats.length > 0 && (
+        <section style={{ marginBottom: 32 }}>
+          <h3 className="day-heading">Erkannte Objekte</h3>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {tagStats.map((tag) => (
+              <button
+                key={tag.label}
+                className="btn secondary"
+                style={{ fontSize: 13 }}
+                onClick={() => filterByTag(tag.label)}
+              >
+                {tag.label} · {tag.count}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {cameraStats.length > 0 && (
         <section style={{ marginBottom: 32 }}>

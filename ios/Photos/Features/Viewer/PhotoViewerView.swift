@@ -39,6 +39,10 @@ struct PhotoViewerView: View {
 
                     Spacer()
 
+                    if assets.count > 1 {
+                        FilmstripView(assets: assets, currentAsset: $currentAsset)
+                    }
+
                     GlassOverlayBar {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(currentAsset.filename).font(.footnote.bold())
@@ -91,6 +95,47 @@ struct PhotoViewerView: View {
             "/assets/\(currentAsset.id)", method: "PUT",
             body: Body(isFavorite: !currentAsset.isFavorite)
         ) as Asset
+    }
+}
+
+/// Horizontal thumbnail strip for quickly jumping between photos without
+/// swiping through every one - matches the original spec's "Filmstreifen"
+/// requirement for the full-screen viewer.
+private struct FilmstripView: View {
+    let assets: [Asset]
+    @Binding var currentAsset: Asset
+
+    private let thumbnailSize: CGFloat = 44
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(assets) { asset in
+                        Button {
+                            withAnimation { currentAsset = asset }
+                        } label: {
+                            CachedThumbnail(assetId: asset.id, url: APIClient.thumbnailURL(for: asset))
+                                .frame(width: thumbnailSize, height: thumbnailSize)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(.white, lineWidth: asset.id == currentAsset.id ? 2 : 0)
+                                )
+                        }
+                        .id(asset.id)
+                    }
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+            }
+            .onChange(of: currentAsset.id) { _, newId in
+                withAnimation { proxy.scrollTo(newId, anchor: .center) }
+            }
+            .task { proxy.scrollTo(currentAsset.id, anchor: .center) }
+        }
+        .frame(height: thumbnailSize + Spacing.sm * 2)
+        .background(.ultraThinMaterial)
     }
 }
 

@@ -2,12 +2,14 @@ import SwiftUI
 
 enum SmartCollection: String, CaseIterable, Identifiable {
     case videos = "Videos"
+    case selfies = "Selfies"
     case screenshots = "Screenshots"
 
     var id: String { rawValue }
     var systemImage: String {
         switch self {
         case .videos: return "video"
+        case .selfies: return "person.crop.square"
         case .screenshots: return "camera.viewfinder"
         }
     }
@@ -15,15 +17,17 @@ enum SmartCollection: String, CaseIterable, Identifiable {
     var mimeTypeFilter: String? {
         switch self {
         case .videos: return "video/"
-        case .screenshots: return nil
+        case .selfies, .screenshots: return nil
         }
     }
 }
 
-/// Auto-detected buckets, e.g. "Videos"/"Screenshots" smart albums.
+/// Auto-detected buckets, e.g. "Videos"/"Selfies"/"Screenshots" smart albums.
 /// Screenshots are detected by filename convention since the backend doesn't
 /// track PHAssetMediaSubtype (that's an on-device-only concept) - "IMG_" vs
-/// "Screenshot" is what iOS itself names them.
+/// "Screenshot" is what iOS itself names them. Selfies are detected from the
+/// EXIF lens model: iPhones label the front camera's lens "... front camera
+/// ..." distinctly from the rear lenses.
 struct CollectionsView: View {
     var body: some View {
         List(SmartCollection.allCases) { collection in
@@ -62,6 +66,11 @@ private struct CollectionAssetsView: View {
         .fullScreenCover(item: $selectedAsset) { asset in
             PhotoViewerView(assets: assets, initialAsset: asset)
         }
+        .overlay {
+            if assets.isEmpty {
+                ContentUnavailableView("Nichts gefunden", systemImage: collection.systemImage)
+            }
+        }
     }
 
     private func load() async {
@@ -76,6 +85,7 @@ private struct CollectionAssetsView: View {
                 switch collection {
                 case .videos: return true
                 case .screenshots: return asset.filename.lowercased().contains("screenshot")
+                case .selfies: return asset.lensModel?.lowercased().contains("front") == true
                 }
             }
         } catch {

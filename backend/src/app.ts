@@ -2,6 +2,7 @@ import "express-async-errors";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import { prisma } from "./db/prisma.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { adminRouter } from "./routes/admin.routes.js";
 import { albumsRouter } from "./routes/albums.routes.js";
@@ -20,6 +21,18 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// Same check, but reachable through the /api prefix nginx actually proxies
+// in production (the bare /health above only exists for the container's own
+// Docker healthcheck) - this is what Settings' "Server-Status" pings.
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: "ok", database: "ok" });
+  } catch {
+    res.status(503).json({ status: "ok", database: "unreachable" });
+  }
+});
 
 app.use("/api/auth", authRouter);
 app.use("/api/assets", assetsRouter);

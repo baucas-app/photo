@@ -19,6 +19,7 @@ const listQuerySchema = z.object({
   archived: z.coerce.boolean().optional(),
   mimeType: z.string().optional(),
   cameraModel: z.string().optional(),
+  tag: z.string().optional(),
 });
 
 assetsRouter.get("/", async (req, res) => {
@@ -31,6 +32,7 @@ assetsRouter.get("/", async (req, res) => {
       isArchived: query.archived ?? false,
       mimeType: query.mimeType ? { startsWith: query.mimeType } : undefined,
       cameraModel: query.cameraModel,
+      tags: query.tag ? { some: { label: query.tag } } : undefined,
     },
     orderBy: [{ takenAt: "desc" }, { uploadedAt: "desc" }],
     take: query.limit,

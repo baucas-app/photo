@@ -1,8 +1,15 @@
 import SwiftUI
 
+private struct HealthResponse: Decodable {
+    let status: String
+    let database: String
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @State private var apiKeys: [ApiKeyInfo] = []
+    @State private var isServerOnline: Bool?
+    @State private var latencyMs: Int?
 
     var body: some View {
         NavigationStack {
@@ -13,6 +20,18 @@ struct SettingsView: View {
                         LabeledContent("Name", value: name)
                     }
                     LabeledContent("Rolle", value: auth.currentUser?.role == .admin ? "Admin" : "Benutzer")
+                }
+
+                Section("Server-Status") {
+                    HStack {
+                        Circle()
+                            .fill(isServerOnline == true ? .green : .red)
+                            .frame(width: 10, height: 10)
+                        Text(serverStatusText)
+                        Spacer()
+                        Button("Neu prüfen") { Task { await checkHealth() } }
+                            .font(.caption)
+                    }
                 }
 
                 BackupStatusView()
@@ -48,7 +67,28 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Einstellungen")
-            .task { await loadApiKeys() }
+            .task {
+                await loadApiKeys()
+                await checkHealth()
+            }
+        }
+    }
+
+    private var serverStatusText: String {
+        guard let isServerOnline else { return "Prüfe…" }
+        guard isServerOnline else { return "Server nicht erreichbar" }
+        return latencyMs.map { "Online · \($0) ms" } ?? "Online"
+    }
+
+    private func checkHealth() async {
+        let start = Date()
+        let response: HealthResponse? = try? await APIClient.shared.request("/health")
+        if let response, response.database == "ok" {
+            isServerOnline = true
+            latencyMs = Int(Date().timeIntervalSince(start) * 1000)
+        } else {
+            isServerOnline = false
+            latencyMs = nil
         }
     }
 

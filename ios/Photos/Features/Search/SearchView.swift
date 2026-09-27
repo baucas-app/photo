@@ -9,6 +9,30 @@ struct SearchView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                if viewModel.results == nil, !viewModel.tagStats.isEmpty {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Erkannte Objekte").font(.headline).padding(.horizontal, Spacing.md)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Spacing.sm) {
+                                ForEach(viewModel.tagStats) { tag in
+                                    Button {
+                                        Task { await viewModel.filterByTag(tag.label) }
+                                    } label: {
+                                        Text("\(tag.label) · \(tag.count)")
+                                            .font(.caption)
+                                            .padding(.horizontal, Spacing.md)
+                                            .padding(.vertical, Spacing.sm)
+                                            .background(.thinMaterial, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, Spacing.md)
+                        }
+                    }
+                    .padding(.top, Spacing.md)
+                }
+
                 if viewModel.results == nil, !viewModel.cameraStats.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.sm) {
                         Text("Aufnahmegeräte").font(.headline).padding(.horizontal, Spacing.md)
@@ -54,7 +78,7 @@ struct SearchView: View {
             .navigationTitle("Suche")
             .searchable(text: $viewModel.query, prompt: "z.B. „Strand“, „Geburtstag“…")
             .onSubmit(of: .search) { Task { await viewModel.search() } }
-            .task { await viewModel.loadCameraStats() }
+            .task { await viewModel.loadFacets() }
             .fullScreenCover(item: $selectedAsset) { asset in
                 PhotoViewerView(assets: viewModel.results ?? [], initialAsset: asset)
             }
