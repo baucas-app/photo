@@ -6,6 +6,7 @@ final class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var isLoading = true
     @Published var errorMessage: String?
+    @Published var savedAccounts: [SavedAccount] = AccountsStore.accounts
 
     private struct AuthResponse: Decodable {
         let user: User
@@ -13,14 +14,20 @@ final class AuthViewModel: ObservableObject {
         let refreshToken: String
     }
 
+    /// Loads whichever account is currently marked active (if any) - the
+    /// normal cold-start path, and also what a fresh `login`/`switchAccount`
+    /// call re-runs to confirm the token it just stored actually works.
     func bootstrap() async {
         defer { isLoading = false }
-        guard ServerConfig.baseURL != nil, KeychainStore.get(.accessToken) != nil else { return }
+        guard let accountId = AccountsStore.activeAccountId,
+              ServerConfig.baseURL != nil,
+              KeychainStore.get(.accessToken, account: accountId) != nil
+        else { return }
         do {
             currentUser = try await APIClient.shared.request("/auth/me")
-            await ensureApiKey()
+            await ensureApiKey(account: accountId)
         } catch {
-            KeychainStore.clearAll()
+            AccountsStore.remove(accountId)
         }
     }
 
@@ -51,24 +58,64 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    /// Signs out of the active account entirely: removes its tokens and its
+    /// entry in the account switcher. To just step away and add a different
+    /// account without losing this one, use `addAccount()` instead.
     func logout() {
-        KeychainStore.clearAll()
+        guard let accountId = AccountsStore.activeAccountId else {
+            currentUser = nil
+            return
+        }
+        AccountsStore.remove(accountId)
+        savedAccounts = AccountsStore.accounts
         currentUser = nil
     }
 
-    private func persist(_ response: AuthResponse) {
-        KeychainStore.set(response.accessToken, for: .accessToken)
-        KeychainStore.set(response.refreshToken, for: .refreshToken)
-        currentUser = response.user
-        Task { await ensureApiKey() }
+    /// Leaves the current account's credentials untouched but clears the
+    /// active session, so RootView falls back to the server/login flow for
+    /// a second account. Switch back via `switchAccount`.
+    func addAccount() {
+        AccountsStore.activeAccountId = nil
+        currentUser = nil
     }
 
-    private func ensureApiKey() async {
-        guard KeychainStore.get(.apiKey) == nil else { return }
+    func switchAccount(to account: SavedAccount) async {
+        guard account.id != AccountsStore.activeAccountId else { return }
+        isLoading = true
+        AccountsStore.activeAccountId = account.id
+        ServerConfig.baseURL = account.serverURL
+        await bootstrap()
+    }
+
+    func removeAccount(_ account: SavedAccount) {
+        AccountsStore.remove(account.id)
+        savedAccounts = AccountsStore.accounts
+        if AccountsStore.activeAccountId == nil {
+            currentUser = nil
+        }
+    }
+
+    private func persist(_ response: AuthResponse) {
+        let accountId = response.user.id
+        KeychainStore.set(response.accessToken, for: .accessToken, account: accountId)
+        KeychainStore.set(response.refreshToken, for: .refreshToken, account: accountId)
+
+        if let serverURL = ServerConfig.baseURL {
+            AccountsStore.upsert(SavedAccount(id: accountId, email: response.user.email, serverURL: serverURL))
+        }
+        AccountsStore.activeAccountId = accountId
+        savedAccounts = AccountsStore.accounts
+
+        currentUser = response.user
+        Task { await ensureApiKey(account: accountId) }
+    }
+
+    private func ensureApiKey(account: String) async {
+        guard KeychainStore.get(.apiKey, account: account) == nil else { return }
         struct Body: Encodable { let name: String }
         guard let created: CreatedApiKey = try? await APIClient.shared.request(
             "/auth/api-keys", method: "POST", body: Body(name: UIDevice.current.name)
         ) else { return }
-        KeychainStore.set(created.key, for: .apiKey)
+        KeychainStore.set(created.key, for: .apiKey, account: account)
     }
 }

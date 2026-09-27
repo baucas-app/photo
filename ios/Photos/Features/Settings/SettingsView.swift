@@ -5,6 +5,32 @@ private struct HealthResponse: Decodable {
     let database: String
 }
 
+/// Split out of SettingsView's account list because the inline version
+/// (Button > HStack > VStack > conditional Image) made the Swift type
+/// checker time out on that one expression.
+private struct AccountRow: View {
+    let account: SavedAccount
+    let isActive: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(account.email).foregroundStyle(.primary)
+                    Text(account.serverURL.host ?? account.serverURL.absoluteString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isActive {
+                    Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                }
+            }
+        }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @State private var apiKeys: [ApiKeyInfo] = []
@@ -20,6 +46,18 @@ struct SettingsView: View {
                         LabeledContent("Name", value: name)
                     }
                     LabeledContent("Rolle", value: auth.currentUser?.role == .admin ? "Admin" : "Benutzer")
+                }
+
+                Section("Konten") {
+                    ForEach(auth.savedAccounts) { account in
+                        AccountRow(account: account, isActive: account.id == auth.currentUser?.id) {
+                            Task { await auth.switchAccount(to: account) }
+                        }
+                        .swipeActions {
+                            Button("Entfernen", role: .destructive) { auth.removeAccount(account) }
+                        }
+                    }
+                    Button("Weiteres Konto hinzufügen") { auth.addAccount() }
                 }
 
                 Section("Server-Status") {

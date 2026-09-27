@@ -30,8 +30,12 @@ actor APIClient {
         return decoder
     }()
 
-    private var accessToken: String? { KeychainStore.get(.accessToken) }
-    private var refreshToken: String? { KeychainStore.get(.refreshToken) }
+    // Every Keychain lookup is scoped to whichever account is currently
+    // active, so switching accounts (AccountsStore.activeAccountId) takes
+    // effect on the very next request without needing a new APIClient.
+    private var currentAccountId: String { AccountsStore.activeAccountId ?? "default" }
+    private var accessToken: String? { KeychainStore.get(.accessToken, account: currentAccountId) }
+    private var refreshToken: String? { KeychainStore.get(.refreshToken, account: currentAccountId) }
 
     private func baseURL() throws -> URL {
         guard let url = ServerConfig.baseURL else { throw APIError.notConfigured }
@@ -112,8 +116,8 @@ actor APIClient {
             return false
         }
 
-        KeychainStore.set(decoded.accessToken, for: .accessToken)
-        KeychainStore.set(decoded.refreshToken, for: .refreshToken)
+        KeychainStore.set(decoded.accessToken, for: .accessToken, account: currentAccountId)
+        KeychainStore.set(decoded.refreshToken, for: .refreshToken, account: currentAccountId)
         return true
     }
 
@@ -153,7 +157,9 @@ actor APIClient {
     // without an actor hop or an Authorization header).
 
     nonisolated static func imageURL(path: String) -> URL? {
-        guard let base = ServerConfig.baseURL, let apiKey = KeychainStore.get(.apiKey) else { return nil }
+        guard let base = ServerConfig.baseURL,
+              let apiKey = KeychainStore.get(.apiKey, account: AccountsStore.activeAccountId ?? "default")
+        else { return nil }
         return base
             .appendingPathComponent("api\(path)")
             .appending(queryItems: [URLQueryItem(name: "apiKey", value: apiKey)])

@@ -64,6 +64,10 @@ Das Xcode-Projekt hat ein zweites Target `PhotosWidgets` (Widget-Extension) für
 die während eines Backups Fortschritt auf dem Sperrbildschirm und in der Dynamic Island zeigt -
 `BackupActivityAttributes.swift` liegt unter `Photos/Shared/` und wird in beide Targets kompiliert.
 
+Mehrere Accounts (auch auf unterschiedlichen Servern) lassen sich gleichzeitig gespeichert halten
+und über Einstellungen → Konten wechseln, ohne sich jedes Mal neu einzuloggen - Tokens liegen dafür
+pro Account-ID in einer eigenen Keychain-Namespace (`KeychainStore`/`AccountsStore`).
+
 ## Deployment auf der Synology NAS
 
 Jeder Push auf `main` baut über GitHub Actions (`.github/workflows/docker-images.yml`) alle vier

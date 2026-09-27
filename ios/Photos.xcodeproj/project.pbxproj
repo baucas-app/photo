@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		07F146F7583E076004440750 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5927D0C70D045F6882F959 /* RootView.swift */; };
+		088FE1FD145DF86E03F89A1F /* AccountsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2790DDCF273B9654D53513B0 /* AccountsStore.swift */; };
 		0A29EF45EFFD52E86675B4DC /* TimelineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF73230E7BF5DC173B766247 /* TimelineViewModel.swift */; };
 		0F5799FE840E89DF100BD70D /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ACF976503F347D9590A529A /* CollectionsView.swift */; };
 		10718E211736A9CD336C5B91 /* AlbumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A9563C089EEB6DDF4B1FD05 /* AlbumDetailView.swift */; };
@@ -83,6 +84,7 @@
 		1119FDE8309650FA55DA02E2 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		1A9563C089EEB6DDF4B1FD05 /* AlbumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailView.swift; sourceTree = "<group>"; };
 		24A1C36DBC2A426E433469F9 /* PhotosWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosWidgetsBundle.swift; sourceTree = "<group>"; };
+		2790DDCF273B9654D53513B0 /* AccountsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsStore.swift; sourceTree = "<group>"; };
 		3048E0109F42D6C16F9EF0C7 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		3E8E8F35E291CEB1E99BBF7D /* BackupActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupActivityAttributes.swift; sourceTree = "<group>"; };
 		49BE3F46440EAB6B1892A00A /* AlbumsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumsView.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 		FD770D5A3589E76BABAA0FF5 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				2790DDCF273B9654D53513B0 /* AccountsStore.swift */,
 				1119FDE8309650FA55DA02E2 /* APIClient.swift */,
 				97747F241BC54AF187B96EDF /* BackupEngine.swift */,
 				6B932414D70CA7213CC1B961 /* ImageCache.swift */,
@@ -418,6 +421,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7DFBD8D05B4D9CF9FBF999E5 /* APIClient.swift in Sources */,
+				088FE1FD145DF86E03F89A1F /* AccountsStore.swift in Sources */,
 				F8FEE2A95E5929136E12E23D /* AdminView.swift in Sources */,
 				5F45B24F688D088048270ED6 /* Album.swift in Sources */,
 				10718E211736A9CD336C5B91 /* AlbumDetailView.swift in Sources */,
