@@ -24,12 +24,8 @@ ml-service/*.pt
 ml-service/*.onnx
 ml-service/models/
 
-# iOS / Xcode
-ios/**/xcuserdata/
-ios/**/.DS_Store
-ios/**/*.xcworkspace/xcuserdata/
-ios/build/
-ios/DerivedData/
+# iOS / Xcode (komplett aus dem Repo ausgeschlossen)
+ios/
 
 # Uploads / local data (never commit real photos)
 uploads/
