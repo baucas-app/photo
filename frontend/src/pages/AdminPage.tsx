@@ -16,6 +16,12 @@ interface GitStatus {
   updateAvailable: boolean;
 }
 
+interface StorageInfo {
+  storageRoot: string;
+  diskUsed: number | null;
+  diskTotal: number | null;
+}
+
 function formatBytes(bytes: number): string {
   const gb = bytes / 1024 ** 3;
   return `${gb.toFixed(2)} GB`;
@@ -100,6 +106,7 @@ export function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string | null>(null);
 
@@ -107,6 +114,7 @@ export function AdminPage() {
     apiJson<Stats>("/admin/stats").then(setStats);
     apiJson<User[]>("/admin/users").then(setUsers);
     apiJson<GitStatus>("/admin/git-status").then(setGitStatus).catch(() => setGitStatus(null));
+    apiJson<StorageInfo>("/admin/storage").then(setStorageInfo).catch(() => setStorageInfo(null));
   }
 
   useEffect(reload, []);
@@ -175,6 +183,44 @@ export function AdminPage() {
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <h3 className="day-heading">Speicherpfad</h3>
+        {storageInfo ? (
+          <div style={{ fontSize: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <code style={{
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                padding: "4px 10px",
+                fontSize: 13,
+                userSelect: "all",
+              }}>
+                {storageInfo.storageRoot}
+              </code>
+            </div>
+            {storageInfo.diskTotal !== null && storageInfo.diskUsed !== null && (
+              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                {formatBytes(storageInfo.diskUsed)} von {formatBytes(storageInfo.diskTotal)} belegt
+                <div style={{ marginTop: 6, height: 6, background: "var(--color-border)", borderRadius: 3, maxWidth: 240 }}>
+                  <div style={{
+                    height: "100%",
+                    borderRadius: 3,
+                    background: "var(--color-accent)",
+                    width: `${Math.min(100, (storageInfo.diskUsed / storageInfo.diskTotal) * 100).toFixed(1)}%`,
+                  }} />
+                </div>
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 8 }}>
+              Konfiguriert über die Umgebungsvariable <code>STORAGE_ROOT</code> in der Docker-Konfiguration.
+            </p>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Wird geladen…</p>
+        )}
       </section>
 
       <section style={{ marginBottom: 32 }}>

@@ -17,7 +17,7 @@ interface AlbumTreeProps {
 
 interface AlbumMenuState {
   albumId: string;
-  kind: "main" | "rename" | "sort" | "lock";
+  kind: "main" | "rename" | "sort" | "lock" | "delete";
 }
 
 export function AlbumTree({ albums, onMoved }: AlbumTreeProps) {
@@ -131,6 +131,19 @@ export function AlbumTree({ albums, onMoved }: AlbumTreeProps) {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Aktion fehlgeschlagen");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAlbum(albumId: string) {
+    setBusy(true);
+    setError(null);
+    setMenu(null);
+    try {
+      await apiJson(`/albums/${albumId}`, { method: "DELETE", body: JSON.stringify({ assetAction: "keep" }) });
+      onMoved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Album konnte nicht gelöscht werden");
       setBusy(false);
     }
   }
@@ -290,6 +303,42 @@ export function AlbumTree({ albums, onMoved }: AlbumTreeProps) {
       );
     }
 
+    if (menu.kind === "delete") {
+      return (
+        <div
+          ref={menuRef}
+          style={{
+            position: "absolute",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            zIndex: 100,
+            padding: 14,
+            minWidth: 220,
+          }}
+        >
+          <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600 }}>Album löschen?</p>
+          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--color-text-muted)" }}>
+            „{album.name}" wird gelöscht. Die Fotos bleiben erhalten.
+          </p>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              className="btn"
+              style={{ flex: 1, fontSize: 12, background: "var(--color-danger, #ff3b30)", borderColor: "var(--color-danger, #ff3b30)" }}
+              disabled={busy}
+              onClick={() => void deleteAlbum(album.id)}
+            >
+              Löschen
+            </button>
+            <button className="btn secondary" style={{ fontSize: 12 }} onClick={() => setMenu(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     // main menu
     return (
       <div
@@ -312,29 +361,40 @@ export function AlbumTree({ albums, onMoved }: AlbumTreeProps) {
               setRenameValue(album.name);
               setMenu({ albumId: album.id, kind: "rename" });
             },
+            danger: false,
           },
           {
             label: "Duplizieren",
             action: () => void duplicateAlbum(album.id),
+            danger: false,
           },
           {
             label: album.pinned ? "Nicht mehr anheften" : "Oben anheften",
             action: () => void togglePin(album),
+            danger: false,
           },
           {
             label: "Sortierung…",
             action: () => setMenu({ albumId: album.id, kind: "sort" }),
+            danger: false,
           },
           album.isLocked
             ? {
                 label: "🔓 Entsperren",
                 action: () => void setLockWithPassword(album.id, null),
+                danger: false,
               }
             : {
                 label: "🔒 Sperren…",
                 action: () => { setLockPasswordInput(""); setMenu({ albumId: album.id, kind: "lock" }); },
+                danger: false,
               },
-        ].map(({ label, action }) => (
+          {
+            label: "Löschen…",
+            action: () => setMenu({ albumId: album.id, kind: "delete" }),
+            danger: true,
+          },
+        ].map(({ label, action, danger }) => (
           <button
             key={label}
             onClick={action}
@@ -347,7 +407,7 @@ export function AlbumTree({ albums, onMoved }: AlbumTreeProps) {
               border: "none",
               cursor: "pointer",
               fontSize: 13,
-              color: "var(--color-text)",
+              color: danger ? "var(--color-danger)" : "var(--color-text)",
             }}
           >
             {label}

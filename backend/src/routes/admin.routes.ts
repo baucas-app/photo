@@ -1,12 +1,14 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { execFile } from "child_process";
 import { prisma } from "../db/prisma.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { BadRequest, Conflict, NotFound } from "../utils/httpError.js";
 import { getGitStatus, pullAndRestart } from "../services/git.service.js";
 import { enqueueMlPipeline, mlQueue } from "../queues/mlQueue.js";
 import { backupStream, deleteBackup, listBackups, runBackup } from "../services/backup.service.js";
+import { env } from "../config/env.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -124,4 +126,26 @@ adminRouter.delete("/backups/:filename", (req, res) => {
   const ok = deleteBackup(req.params.filename);
   if (!ok) throw NotFound("Backup not found");
   res.status(204).send();
+});
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+
+adminRouter.get("/storage", (_req, res) => {
+  const storageRoot = env.storageRoot;
+  execFile("df", ["-k", storageRoot], (_err, stdout) => {
+    let used: number | null = null;
+    let total: number | null = null;
+    if (stdout) {
+      const lines = stdout.trim().split("\n");
+      if (lines.length >= 2) {
+        const parts = lines[1].split(/\s+/);
+        // df -k columns: Filesystem 1K-blocks Used Available Use% Mounted
+        if (parts.length >= 3) {
+          total = parseInt(parts[1], 10) * 1024;
+          used = parseInt(parts[2], 10) * 1024;
+        }
+      }
+    }
+    res.json({ storageRoot, diskUsed: used, diskTotal: total });
+  });
 });
