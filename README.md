@@ -1,111 +1,97 @@
 # BauCas Photos
 
-Selbstgehostetes Fotoverwaltungssystem für die Synology NAS – Apple-Photos-ähnliche Erfahrung mit lokaler KI (semantische CLIP-Suche, YOLO-Tagging, Gesichtserkennung), ohne Cloud-Abhängigkeit.
+Selbstgehostete Fotoverwaltung für die Synology NAS – Apple-Photos-ähnliche Erfahrung mit lokaler KI, ohne Cloud.
+
+---
 
 ## Features
 
-**Mediathek & Ansicht**
-- Chronologische Timeline mit Cursor-Pagination und Zoom-Stufen (Tag / Monat / Jahr)
-- Foto-Viewer mit Filmstreifen, Live-Photo-Loop, AirPlay, 360°-Panorama, Slideshow
+### Mediathek
+- Chronologische Timeline mit Zoom-Stufen (Tag / Monat / Jahr) und Cursor-Pagination
+- Foto-Viewer mit Filmstreifen, Live-Photo-Loop, 360°-Panorama, Slideshow und AirPlay
 - Karten-Ansicht (GPS-Pins aus EXIF)
-- Erinnerungen: „Heute vor N Jahren"-Rückblick
-- Archiv & Papierkorb (30 Tage automatische Bereinigung)
+- Erinnerungen: „Heute vor N Jahren"
+- Archiv & Papierkorb (30 Tage Aufbewahrung)
 - Foto-Editor: Drehen, Zuschneiden, Helligkeit/Kontrast (nicht-destruktiv, Revert möglich)
 
-**Alben & Sammlungen**
-- Manuelle Alben mit Unteralben (beliebig tief), Drag-and-Drop-Sortierung im Web
-- Smart-Alben (regelbasierte Filterung)
-- Tag-Gruppen & Benutzer-Labels für eigene Klassifikationen
-- Reisen: GPS-basierte Zeiträume als eigene Sammlung
+### Alben & Sammlungen
+- Manuelle Alben mit beliebig tiefer Unteralbum-Hierarchie
+- Drag-and-Drop-Sortierung im Web-Albenbaum
+- Smart-Alben (regelbasierte Filter)
+- Tag-Gruppen & Benutzer-Labels
+- Reisen (GPS-basierte Zeiträume)
 
-**Backup (iOS → Server)**
-- Manuell und automatisch im Hintergrund (BGProcessingTask)
-- Konfigurierbar: Ziel-Album, Monats-Unteralben, Dateiname-Template, Netzwerk-Präferenz (WLAN / Mobilfunk)
-- Live Activity / Dynamic Island während des Uploads
+### iOS-Backup
+- Automatisches Hintergrund-Backup (BGProcessingTask) + manueller Start
+- Ziel-Album, Monats-Unteralben und Dateiname-Template frei konfigurierbar
+- Netzwerk-Präferenz: nur WLAN, nur Mobilfunk oder beides
 - Live Photos als verkettetes Paar (Motion-Video + Still)
+- Live Activity / Dynamic Island während des Uploads
 - Optionales Löschen nach erfolgreichem Upload
 
-**Teilen & Zusammenarbeit**
+### Teilen & Zusammenarbeit
 - Geteilte Alben mit Rollen (Betrachter / Editor)
-- Öffentliche Freigabe-Links (mit optionalem Passwortschutz)
-- Partner-Bibliothek: eine andere Person sieht die eigene Mediathek read-only
+- Öffentliche Freigabe-Links mit optionalem Passwortschutz
+- Partner-Bibliothek (andere Person sieht eigene Mediathek read-only)
 - Album-Kommentare
 
-**Suche & KI**
-- Semantische CLIP-Suche (Freitext über Bildinhalt)
-- Objekt-Tags via YOLO (automatisch bei Upload)
-- Gesichtserkennung + Clustering (Cosinus-Ähnlichkeit)
-- Kamera-Facetten (nach Make/Model aus EXIF filtern)
-- Duplikat-Erkennung via Perceptual Hash (aHash, Hamming-Distanz ≤ 6)
+### Suche & KI
+- Semantische Freitextsuche via CLIP-Embeddings
+- Automatische Objekt-Tags via YOLO (yolov8n)
+- Gesichtserkennung + Cosinus-Clustering
+- Kamera-Facetten (nach Make/Model aus EXIF)
+- Duplikat-Erkennung via Perceptual Hash (aHash, Hamming ≤ 6)
 
-**Verwaltung**
-- Mehrere Konten auf unterschiedlichen Servern (iOS: per Account-ID getrennte Keychain-Einträge)
-- API-Keys für direktes Einbetten von Bild-URLs (`?apiKey=...` oder `X-Api-Key`-Header)
+### Verwaltung
+- Mehrere Konten auf unterschiedlichen Servern (getrennte Keychain-Einträge)
+- API-Keys für direktes Einbetten von Bild-URLs
 - OAuth 2.0 (Google)
-- Admin-Panel: Nutzer anlegen, git-Pull + Container-Neustart, Server-Backups (pg_dump)
 - Push-Benachrichtigungen (APNS)
-- Dawarich-kompatibler Endpunkt für GPS-Export
+- Admin-Panel: Nutzer, git-Pull + Container-Neustart, Server-Backups (pg_dump)
+- Dawarich-kompatibler GPS-Export-Endpunkt
 
 ---
 
 ## Architektur
 
 ```
-ios/                iOS-App (SwiftUI, iOS 26+, xcodegen)
-frontend/           Web-UI (React + Vite + TypeScript)
-backend/            REST-API (Node.js/Express + TypeScript, Prisma)
-backup-worker/      BullMQ-Worker: führt die ML-Pipeline pro Foto aus
-ml-service/         Python/FastAPI: CLIP-Embeddings, YOLO-Tagging, Gesichtserkennung
-packages/database/  Gemeinsamer Prisma-Client (backend + backup-worker)
-packages/shared/    Gemeinsame TS-Utilities (Vektor-Mathe, ml-service-Client, Job-Typen)
-cli/                Node-Skript für Bulk-Uploads von der Kommandozeile
+ios/                SwiftUI-App, iOS 26+
+frontend/           React + Vite + TypeScript
+backend/            Node.js / Express / TypeScript / Prisma
+backup-worker/      BullMQ-Worker für die ML-Pipeline
+ml-service/         Python / FastAPI – CLIP, YOLO, Gesichtserkennung
+packages/database/  Gemeinsamer Prisma-Client
+packages/shared/    Gemeinsame TS-Utilities
+cli/                Bulk-Upload-Skript
 ```
 
-Das Dateisystem unter `STORAGE_ROOT` (`/photos` im Container) ist die Wahrheit für Dateien;
-Postgres ist die Wahrheit für Metadaten. Jeder `assets.path`/`albums.path` ist relativ zu
-`STORAGE_ROOT`, z.B. `2024/Urlaub/Barcelona/photo1.jpg`.
+`STORAGE_ROOT` ist die Wahrheit für Dateien, Postgres für Metadaten. Pfade in `assets` und `albums` sind relativ zu `STORAGE_ROOT`.
 
 ---
 
 ## Lokale Entwicklung
 
-### Voraussetzungen
-
-- Node.js 22+, npm 10+
-- Docker + Docker Compose
-- Xcode 16+ und [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) für die iOS-App
-- PostgreSQL + Redis lokal (oder via Docker)
-
-### Setup
-
 ```bash
-npm install                           # alle Workspaces (backend, frontend, backup-worker, packages/*)
-cp backend/.env.example backend/.env  # DATABASE_URL, JWT-Secrets, STORAGE_ROOT anpassen
+npm install
+cp backend/.env.example backend/.env   # DATABASE_URL, JWT_SECRET, STORAGE_ROOT setzen
 
-npm run prisma:generate    # Prisma-Client generieren
-npm run prisma:migrate:dev # Schema migrieren
+npm run prisma:generate
+npm run prisma:migrate:dev
 
-# Backend ohne Watch-Modus starten (tsx watch hängt sich in Synology-Drive-Pfaden auf):
+# Backend OHNE watch starten (tsx watch hängt im Synology-Drive-Pfad):
 cd backend && ../node_modules/.bin/tsx src/index.ts
 
-npm run dev:frontend       # Web-UI auf :5173 (proxied /api → :3001)
-npm run dev:worker         # ML-Worker (braucht Redis + laufenden ml-service)
+npm run dev:frontend    # :5173, proxied /api → :3001
+npm run dev:worker      # braucht Redis + laufenden ml-service
 ```
 
-ML-Service lokal: `cd ml-service && pip install -r requirements.txt && uvicorn app.main:app --reload`
+ML-Service: `cd ml-service && pip install -r requirements.txt && uvicorn app.main:app --reload`
 
-> **Synology-Drive-Hinweis:** `tsx watch` / `npm run dev:backend` hängt im Sync-Pfad – immer ohne Watch starten. `pip install` in einer `.venv` innerhalb des Sync-Ordners kann Pakete korrumpieren; notfalls `.venv` unter `/tmp` anlegen und nur das Ergebnis ins Projekt übernehmen.
-
-### iOS-App (Simulator)
+### iOS-App bauen (Simulator)
 
 ```bash
-cd ios
-xcodegen generate    # erzeugt Photos.xcodeproj aus project.yml
-```
+cd ios && xcodegen generate
 
-Build + Install auf dem Simulator (fixierter DerivedData-Pfad vermeidet Synology-Drive-Konfliktkopien):
-
-```bash
 xcodebuild -project Photos.xcodeproj -scheme Photos \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   -configuration Debug -derivedDataPath /tmp/photos-build build
@@ -113,57 +99,41 @@ xcodebuild -project Photos.xcodeproj -scheme Photos \
 SIMULATOR_ID=$(xcrun simctl list devices booted | grep "iPhone 17" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
 xcrun simctl terminate "$SIMULATOR_ID" de.baucas.photos 2>/dev/null || true
 xcrun simctl uninstall "$SIMULATOR_ID" de.baucas.photos
-xcrun simctl install  "$SIMULATOR_ID" /tmp/photos-build/Build/Products/Debug-iphonesimulator/Photos.app
-xcrun simctl launch   "$SIMULATOR_ID" de.baucas.photos
+xcrun simctl install   "$SIMULATOR_ID" /tmp/photos-build/Build/Products/Debug-iphonesimulator/Photos.app
+xcrun simctl launch    "$SIMULATOR_ID" de.baucas.photos
 ```
 
-Beim ersten Start fragt die App nach der Server-Adresse (z.B. `http://192.168.178.61:3001`). Danach Login oder Registrierung; der erste registrierte Account wird automatisch Admin.
+> `-derivedDataPath /tmp/photos-build` ist Pflicht: Synology Drive erzeugt Konfliktkopien mit eigenem DerivedData-Hash – ohne fixen Pfad würde `xcodebuild` den falschen Build installieren.
 
 ---
 
-## Deployment auf der Synology NAS
+## Deployment (Synology NAS)
 
-Jeder Push auf `main` baut via GitHub Actions alle vier Images und veröffentlicht sie unter
-`ghcr.io/baucas-app/photo-*:latest`.
+GitHub Actions baut bei jedem Push alle Images und veröffentlicht sie als `ghcr.io/baucas-app/photo-*:latest`.
 
-### Variante A: Nur docker-compose.yml (empfohlen)
+**Variante A – nur `docker-compose.yml` (empfohlen)**
 
-Kein Git-Clone nötig – `docker-compose.yml` auf die NAS kopieren, dann:
-
-1. `volumes.photos-library.driver_opts.device` auf den echten Fotoordner setzen (z.B. `/volume1/photos`).
-2. `docker compose up -d` – Docker zieht die fertigen Images von GHCR.
-3. Updates: `docker compose pull && docker compose up -d`.
+1. `docker-compose.yml` auf die NAS kopieren, `volumes.photos-library.driver_opts.device` auf den Fotoordner setzen.
+2. `docker compose up -d` – zieht fertige Images von GHCR.
+3. Updates: `docker compose pull && docker compose up -d`
 
 JWT-Secrets werden beim ersten Start automatisch generiert und im `app-data`-Volume abgelegt.
 
-### Variante B: Git-Clone (für den Update-Button im Admin-Panel)
+**Variante B – Git-Clone** (für `POST /api/admin/git-update` im Admin-Panel)
 
-1. Repo klonen: `git clone https://github.com/baucas-app/photo.git`
-2. Fotoordner-Pfad anpassen; `backend/.env` ist optional.
-3. `docker compose up -d --build`
-4. Das Admin-Panel kann per Knopfdruck `git pull` + Container-Neustart auslösen (`POST /api/admin/git-update`) – dafür ist der Docker-Socket in den Backend-Container gemountet.
+1. Repo klonen, Fotoordner-Pfad anpassen.
+2. `docker compose up -d --build`
 
-Web-UI: `http://<nas-ip>:8080` · Backend-API: `:3001`
+Web-UI `http://<nas-ip>:8080` · Backend-API `:3001` · Erster registrierter Account wird Admin.
 
 ---
 
-## ML-Pipeline
+## Einschränkungen
 
-Bei jedem Upload wird ein Job in die `ml-pipeline`-Queue (Redis/BullMQ) eingereiht. `backup-worker` verarbeitet ihn:
-
-1. **CLIP** → 512-d-Embedding für semantische Freitextsuche (`GET /api/search?q=...`)
-2. **YOLO** (yolov8n) → Objekt-Tags in `tags` (Quelle `yolo`)
-3. **face_recognition** → Gesichts-Boxen + 128-d-Embeddings; Cosinus-Clustering gegen bestehende `faces` des Users
-4. **Perceptual Hash** (aHash, im Backend) → Duplikat-Erkennung
-
-Modelle laden lazy und werden gecacht (`functools.lru_cache`) – relevant für den begrenzten RAM der DS1621+.
-
----
-
-## Bekannte Einschränkungen
-
-- **Backup-Delta-Sync:** `BackupEngine` trackt bereits hochgeladene Assets per `localIdentifier` in UserDefaults. Bei App-Neuinstallation landen Re-Uploads als Duplikate – über die Duplikate-Seite bereinigbar.
-- **Semantische Suche:** Brute-Force-Cosinus-Vergleich in Node – skaliert für eine Bibliothek, nicht für viele parallele Nutzer mit riesigen Bibliotheken. Für Letzteres wäre `pgvector` der nächste Schritt.
-- **Sign In with Apple** wurde bewusst entfernt (Personal-Team-Provisioning unterstützt das Entitlement nicht).
-- **Google OAuth** und **Push-Benachrichtigungen (APNS)** erfordern eigene Credentials in `backend/.env` (`GOOGLE_CLIENT_*`, `APNS_*`) – ohne diese sind die Features deaktiviert.
-- **ML-Service** läuft nicht dauerhaft lokal (nur auf der NAS im Docker-Stack) – KI-Features stehen in der lokalen Entwicklung nur zur Verfügung, wenn `ml-service` manuell gestartet wird.
+| Thema | Hinweis |
+|---|---|
+| Backup-Delta-Sync | Tracking per `localIdentifier` in UserDefaults – nach App-Neuinstallation landen Re-Uploads als Duplikate (über Duplikate-Seite bereinigbar) |
+| Semantische Suche | Brute-Force-Cosinus in Node – skaliert für eine Bibliothek; für viele Nutzer wäre `pgvector` der nächste Schritt |
+| Sign In with Apple | Bewusst entfernt – Personal Team unterstützt das Entitlement nicht |
+| Google OAuth & APNS | Erfordern `GOOGLE_CLIENT_*` bzw. `APNS_*` in `backend/.env`; ohne diese deaktiviert |
+| ML-Service lokal | Läuft nicht dauerhaft – KI-Features nur verfügbar, wenn `ml-service` manuell gestartet ist |
