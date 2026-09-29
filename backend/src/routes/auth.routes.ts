@@ -113,6 +113,23 @@ authRouter.get("/me", requireAuth, async (req, res) => {
   res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
+const updateMeSchema = z.object({
+  name: z.string().min(1).max(60).optional(),
+  email: z.string().email().optional(),
+});
+
+authRouter.put("/me", requireAuth, async (req, res) => {
+  const data = updateMeSchema.parse(req.body);
+  if (data.email) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing && existing.id !== req.user!.sub) {
+      throw BadRequest("E-Mail-Adresse bereits vergeben");
+    }
+  }
+  const user = await prisma.user.update({ where: { id: req.user!.sub }, data });
+  res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
+});
+
 const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
