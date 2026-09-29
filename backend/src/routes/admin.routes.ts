@@ -137,10 +137,10 @@ adminRouter.get("/storage", (_req, res) => {
     let total: number | null = null;
     if (stdout) {
       const lines = stdout.trim().split("\n");
-      if (lines.length >= 2) {
+      if (lines.length >= 2 && lines[1] !== undefined) {
         const parts = lines[1].split(/\s+/);
         // df -k columns: Filesystem 1K-blocks Used Available Use% Mounted
-        if (parts.length >= 3) {
+        if (parts.length >= 3 && parts[1] !== undefined && parts[2] !== undefined) {
           total = parseInt(parts[1], 10) * 1024;
           used = parseInt(parts[2], 10) * 1024;
         }
