@@ -44,7 +44,7 @@ struct DuplicatesView: View {
                                     .aspectRatio(1, contentMode: .fill)
                                     .clipShape(RoundedRectangle(cornerRadius: Radius.sm))
 
-                                Button("Löschen", role: .destructive) {
+                                Button("In den Papierkorb", role: .destructive) {
                                     Task { await delete(asset.id) }
                                 }
                                 .font(.caption)
@@ -72,7 +72,8 @@ struct DuplicatesView: View {
     }
 
     private func delete(_ assetId: String) async {
-        try? await APIClient.shared.requestVoid("/assets/\(assetId)", method: "DELETE")
+        // DELETE only moves to the trash now (restorable for 30 days).
+        try? await AssetChanges.shared.moveToTrash(assetId)
         await load()
     }
 }

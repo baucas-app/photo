@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 enum APIError: Error, LocalizedError {
     case notConfigured
@@ -70,7 +71,7 @@ actor APIClient {
         authenticated: Bool,
         retry: Bool
     ) async throws -> Data {
-        var request = URLRequest(url: try baseURL().appendingPathComponent("api\(path)"))
+        var request = URLRequest(url: try apiURL(for: path))
         request.httpMethod = method
 
         if let body {
@@ -101,6 +102,19 @@ actor APIClient {
         return data
     }
 
+    /// `appendingPathComponent` percent-encodes "?" (-> "%3F"), which turned
+    /// every `"/assets?cursor=..."`-style path into a 404. Split the query
+    /// off first and attach it as real query items.
+    private func apiURL(for path: String) throws -> URL {
+        let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let url = try baseURL().appendingPathComponent("api\(parts[0])")
+        guard parts.count == 2, !parts[1].isEmpty,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return url }
+        components.percentEncodedQuery = String(parts[1])
+        return components.url ?? url
+    }
+
     private struct ErrorResponse: Decodable { let error: String }
 
     @discardableResult
@@ -123,9 +137,16 @@ actor APIClient {
 
     // MARK: - Multipart upload
 
-    func upload<T: Decodable>(_ path: String, fileURL: URL, fieldName: String = "file", extraFields: [String: String] = [:]) async throws -> T {
+    func upload<T: Decodable>(
+        _ path: String,
+        fileURL: URL,
+        fieldName: String = "file",
+        extraFields: [String: String] = [:],
+        allowsCellularAccess: Bool = true
+    ) async throws -> T {
         var request = URLRequest(url: try baseURL().appendingPathComponent("api\(path)"))
         request.httpMethod = "POST"
+        request.allowsCellularAccess = allowsCellularAccess
         if let accessToken { request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization") }
 
         let boundary = "Boundary-\(UUID().uuidString)"
@@ -141,7 +162,12 @@ actor APIClient {
         let fileData = try Data(contentsOf: fileURL)
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        // The backend re-derives the type from the filename extension as a
+        // safety net, but sending the real one at the source means EXIF
+        // extraction, hashing, and video detection don't depend on that
+        // fallback ever running (backend/src/utils/mediaType.ts).
+        let contentType = UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        body.append("Content-Type: \(contentType)\r\n\r\n".data(using: .utf8)!)
         body.append(fileData)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
@@ -171,6 +197,24 @@ actor APIClient {
 
     nonisolated static func fileURL(for asset: Asset) -> URL? {
         imageURL(path: "/assets/\(asset.id)/file")
+    }
+
+    /// Browser-displayable JPEG (max 2048px) - lighter than the original,
+    /// used where full resolution isn't needed (e.g. the 360° sphere texture).
+    nonisolated static func previewURL(for asset: Asset) -> URL? {
+        imageURL(path: "/assets/\(asset.id)/preview")
+    }
+
+    /// Public helper to build a URL for an authenticated fetch from outside
+    /// the actor (e.g. zip download). Returns nil if the server is not configured.
+    func urlFor(_ path: String) -> URL? {
+        try? apiURL(for: path)
+    }
+
+    /// Returns the current short-lived JWT so a caller can attach
+    /// an Authorization header to its own URLRequest.
+    func currentAccessToken() -> String? {
+        accessToken
     }
 }
 

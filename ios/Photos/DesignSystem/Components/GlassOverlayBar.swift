@@ -43,10 +43,16 @@ struct GlassFloatingActionButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
-                .frame(width: 56, height: 56)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.glass)
+        // .buttonStyle(.glass) pads the content frame above with its own
+        // material inset, so the *rendered* capsule ends up taller than the
+        // 44pt asked for above - pin the final size explicitly (after the
+        // style, not inside the label) so this matches GlassSegmentedToggle,
+        // which sizes its capsule the same way for the same reason.
+        .frame(width: 44, height: 44)
         .tint(.accentColor)
     }
 }

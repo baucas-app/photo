@@ -4,6 +4,7 @@ import SwiftUI
 struct BackupStatusView: View {
     @StateObject private var backupEngine = BackupEngine.shared
     @State private var authorizationStatus = PhotoLibraryService.authorizationStatus
+    @AppStorage(BackupSettings.autoBackupEnabledKey) private var isAutoBackupEnabled = false
 
     var body: some View {
         Section("Backup") {
@@ -32,6 +33,12 @@ struct BackupStatusView: View {
                     Task { await backupEngine.runBackup() }
                 }
                 .disabled(backupEngine.status == .running)
+            }
+
+            NavigationLink {
+                BackupSettingsView()
+            } label: {
+                LabeledContent("Backup-Einstellungen", value: isAutoBackupEnabled ? "Automatisch an" : "Automatisch aus")
             }
         }
     }

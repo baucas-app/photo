@@ -62,8 +62,8 @@ export async function removeEmptyDir(relativePath: string): Promise<void> {
   }
 }
 
-export function yearMonthFolder(date: Date): string {
+export function yearMonthFolder(userId: string, date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `/${year}/${month}`;
+  return `/${userId}/${year}/${month}`;
 }

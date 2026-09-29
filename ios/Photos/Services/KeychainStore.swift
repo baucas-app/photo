@@ -25,6 +25,10 @@ enum KeychainStore {
 
         var attributes = query
         attributes[kSecValueData as String] = data
+        // kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly: tokens are available
+        // after the first unlock and are never backed up to iCloud or migrated to
+        // another device — appropriate for auth secrets.
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(attributes as CFDictionary, nil)
     }
 

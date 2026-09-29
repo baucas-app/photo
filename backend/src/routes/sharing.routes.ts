@@ -2,8 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
-import { toAbsolutePath } from "../services/filesystem.service.js";
-import { getOrCreateThumbnail } from "../services/thumbnail.service.js";
+import { notifyUser } from "../services/apns.service.js";
+import { notifyUserEmail } from "../services/email.service.js";
+import { sendRendition } from "../services/thumbnail.service.js";
+import { sendAssetFile } from "../utils/sendAssetFile.js";
 import {
   addAlbumMember,
   createShareLink,
@@ -63,6 +65,29 @@ const memberSchema = z.object({
 sharingRouter.post("/albums/:id/members", async (req, res) => {
   const { email, role } = memberSchema.parse(req.body);
   const member = await addAlbumMember(req.user!.sub, req.params.id, email, role);
+  // Push notification to the newly invited user
+  const album = await prisma.album.findUnique({
+    where: { id: req.params.id },
+    select: { name: true, userId: true },
+  });
+  if (album) {
+    const inviter = await prisma.user.findUnique({
+      where: { id: req.user!.sub },
+      select: { name: true, email: true },
+    });
+    const inviterName = inviter?.name ?? inviter?.email ?? "Jemand";
+    const albumName = album.name;
+    notifyUser(
+      member.userId,
+      "Neues Album geteilt",
+      `${inviterName} hat das Album „${albumName}" mit dir geteilt.`
+    ).catch(() => {});
+    notifyUserEmail(
+      member.userId,
+      `Album geteilt: ${albumName}`,
+      `<p>Hallo,</p><p><b>${inviterName}</b> hat das Album <b>${albumName}</b> mit dir geteilt.</p>`
+    ).catch(() => {});
+  }
   res.status(201).json(member);
 });
 
@@ -84,14 +109,17 @@ publicSharingRouter.get("/albums/:token", async (req, res) => {
 publicSharingRouter.get("/albums/:token/assets/:assetId/thumbnail", async (req, res) => {
   const { password } = publicQuerySchema.parse(req.query);
   const asset = await resolvePublicAsset(req.params.token, req.params.assetId, password);
-  const thumbPath = await getOrCreateThumbnail(asset.id, asset.path);
-  res.sendFile(thumbPath, { headers: { "Content-Type": "image/webp" } });
+  await sendRendition(res, asset, "thumbnail");
+});
+
+publicSharingRouter.get("/albums/:token/assets/:assetId/preview", async (req, res) => {
+  const { password } = publicQuerySchema.parse(req.query);
+  const asset = await resolvePublicAsset(req.params.token, req.params.assetId, password);
+  await sendRendition(res, asset, "preview");
 });
 
 publicSharingRouter.get("/albums/:token/assets/:assetId/file", async (req, res) => {
   const { password } = publicQuerySchema.parse(req.query);
   const asset = await resolvePublicAsset(req.params.token, req.params.assetId, password);
-  res.sendFile(toAbsolutePath(asset.path), {
-    headers: { "Content-Type": asset.mimeType ?? "application/octet-stream" },
-  });
+  sendAssetFile(res, asset);
 });

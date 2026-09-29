@@ -3,16 +3,21 @@ import SwiftUI
 struct ServerSetupView: View {
     @State private var scheme: String
     @State private var hostInput: String
-    let onConfigured: () -> Void
+    let onCancel: (() -> Void)?
+    let onConfigured: (URL) -> Void
 
-    init(onConfigured: @escaping () -> Void) {
+    /// `onCancel` stays before `onConfigured` so existing trailing-closure
+    /// call sites (`ServerSetupView { ... }`) keep binding to `onConfigured`
+    /// - the last parameter - without needing to change.
+    init(onCancel: (() -> Void)? = nil, onConfigured: @escaping (URL) -> Void) {
+        self.onCancel = onCancel
         self.onConfigured = onConfigured
         if let existing = ServerConfig.baseURL, let host = existing.host {
             let port = existing.port.map { ":\($0)" } ?? ""
             _scheme = State(initialValue: existing.scheme ?? "https")
             _hostInput = State(initialValue: "\(host)\(port)")
         } else {
-            _scheme = State(initialValue: "https")
+            _scheme = State(initialValue: "http")
             _hostInput = State(initialValue: "")
         }
     }
@@ -20,11 +25,18 @@ struct ServerSetupView: View {
     // Users just type the host (and optional port) - no more remembering to
     // type "https://" themselves; the scheme comes from the picker instead.
     private var composedURL: URL? {
-        let trimmed = hostInput
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: #"^https?://"#, with: "", options: .regularExpression)
-        guard !trimmed.isEmpty else { return nil }
-        return URL(string: "\(scheme)://\(trimmed)")
+        let raw = hostInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        var effectiveScheme = scheme
+        var host = raw
+        if raw.hasPrefix("https://") {
+            effectiveScheme = "https"
+            host = String(raw.dropFirst("https://".count))
+        } else if raw.hasPrefix("http://") {
+            effectiveScheme = "http"
+            host = String(raw.dropFirst("http://".count))
+        }
+        guard !host.isEmpty else { return nil }
+        return URL(string: "\(effectiveScheme)://\(host)")
     }
 
     var body: some View {
@@ -45,6 +57,16 @@ struct ServerSetupView: View {
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .onChange(of: hostInput) { _, new in
+                            // Strip any pasted scheme prefix and sync the picker.
+                            if new.hasPrefix("https://") {
+                                scheme = "https"
+                                hostInput = String(new.dropFirst("https://".count))
+                            } else if new.hasPrefix("http://") {
+                                scheme = "http"
+                                hostInput = String(new.dropFirst("http://".count))
+                            }
+                        }
                 }
             } header: {
                 Text("Server-Adresse")
@@ -54,11 +76,25 @@ struct ServerSetupView: View {
         }
         .navigationTitle("Server einrichten")
         .toolbar {
+            if let onCancel {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Abbrechen", action: onCancel)
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Weiter") {
                     guard let url = composedURL else { return }
-                    ServerConfig.baseURL = url
-                    onConfigured()
+                    // Standalone/first-run flow (no onCancel, no other
+                    // session active): safe to commit immediately, LoginView
+                    // needs it set. In the "add another account" flow, the
+                    // caller holds onto the URL instead and sets it right
+                    // before the login/register call, so the active
+                    // session's requests aren't briefly redirected to the
+                    // new server while the sheet is still being filled in.
+                    if onCancel == nil {
+                        ServerConfig.baseURL = url
+                    }
+                    onConfigured(url)
                 }
                 .disabled(composedURL == nil)
             }

@@ -7,6 +7,13 @@ struct SharingView: View {
     @State private var password = ""
     @State private var errorMessage: String?
 
+    /// Lets the album context menu's "Freigeben" jump straight into this
+    /// flow with the right album already picked, instead of making the user
+    /// find it again in the picker.
+    init(preselectedAlbumId: String? = nil) {
+        _selectedAlbumId = State(initialValue: preselectedAlbumId)
+    }
+
     var body: some View {
         Form {
             Section("Neuen Link erstellen") {

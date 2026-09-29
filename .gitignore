@@ -39,3 +39,9 @@ data/redis/
 # Editor
 .vscode/
 .idea/
+
+# Local dev credentials (never commit)
+DEV_CREDENTIALS.md
+
+# Test images
+testbilder/

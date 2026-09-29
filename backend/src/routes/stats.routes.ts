@@ -30,13 +30,19 @@ statsRouter.get("/cameras", async (req, res) => {
 statsRouter.get("/overview", async (req, res) => {
   const userId = req.user!.sub;
   const [totalAssets, favorites, videos, byYear] = await Promise.all([
-    prisma.asset.count({ where: { userId } }),
-    prisma.asset.count({ where: { userId, isFavorite: true } }),
-    prisma.asset.count({ where: { userId, mimeType: { startsWith: "video/" } } }),
+    prisma.asset.count({ where: { userId, deletedAt: null, stackParentId: null, isLivePhotoMotion: false } }),
+    prisma.asset.count({
+      where: { userId, isFavorite: true, deletedAt: null, stackParentId: null, isLivePhotoMotion: false },
+    }),
+    // A Live Photo's video component must not inflate the video count - the
+    // user never sees it as a standalone video, only through its still photo.
+    prisma.asset.count({
+      where: { userId, mimeType: { startsWith: "video/" }, deletedAt: null, isLivePhotoMotion: false },
+    }),
     prisma.$queryRaw<{ year: number; count: bigint }[]>`
       SELECT EXTRACT(YEAR FROM "taken_at")::int AS year, COUNT(*)::bigint AS count
       FROM "assets"
-      WHERE "user_id" = ${userId} AND "taken_at" IS NOT NULL
+      WHERE "user_id" = ${userId} AND "taken_at" IS NOT NULL AND "deleted_at" IS NULL
       GROUP BY year
       ORDER BY year DESC
     `,

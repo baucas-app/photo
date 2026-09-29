@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { openImage } from "./imageDecoder.service.js";
 
 /**
  * 64-bit average hash (aHash): resize to 8x8 grayscale, threshold each pixel
@@ -8,7 +8,8 @@ import sharp from "sharp";
  * files (a plain file hash would miss those).
  */
 export async function computePerceptualHash(absolutePath: string): Promise<string> {
-  const { data } = await sharp(absolutePath)
+  // openImage: HEVC-HEIC (iPhone default) isn't decodable by the stock sharp binary.
+  const { data } = await (await openImage(absolutePath))
     .resize(8, 8, { fit: "fill" })
     .grayscale()
     .raw()

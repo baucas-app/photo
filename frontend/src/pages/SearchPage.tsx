@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { apiJson } from "../api/client";
 import type { Asset } from "../api/types";
 import { PhotoGrid } from "../components/PhotoGrid";
@@ -31,16 +31,32 @@ export function SearchPage() {
     apiJson<TagStat[]>("/tags").then(setTagStats);
   }, []);
 
+  const [error, setError] = useState<string | null>(null);
+  // Monotonic request id: a slow earlier search/filter must not overwrite the
+  // results of a later one (tag/camera buttons stay clickable while loading).
+  const requestIdRef = useRef(0);
+
+  async function runRequest(displayLabel: string, fetchAssets: () => Promise<Asset[]>) {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(null);
+    setQuery(displayLabel);
+    try {
+      const assets = await fetchAssets();
+      if (requestId === requestIdRef.current) setResults(assets);
+    } catch {
+      if (requestId === requestIdRef.current) setError("Suche fehlgeschlagen.");
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }
+
   async function runSearch(q: string) {
     if (!q.trim()) return;
-    setLoading(true);
-    setQuery(q);
-    try {
+    await runRequest(q, async () => {
       const data = await apiJson<{ results: SearchResult[] }>(`/search?q=${encodeURIComponent(q)}`);
-      setResults(data.results.map((r) => r.asset));
-    } finally {
-      setLoading(false);
-    }
+      return data.results.map((r) => r.asset);
+    });
   }
 
   async function filterByCamera(model: string | null) {
@@ -53,14 +69,20 @@ export function SearchPage() {
   }
 
   async function filterByAssetsQuery(displayLabel: string, queryString: string) {
-    setLoading(true);
-    setQuery(displayLabel);
-    try {
-      const data = await apiJson<{ assets: Asset[] }>(`/assets?${queryString}`);
-      setResults(data.assets);
-    } finally {
-      setLoading(false);
-    }
+    await runRequest(displayLabel, async () => {
+      const all: Asset[] = [];
+      let cursor: string | null = null;
+      for (;;) {
+        const cursorPart: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+        const data = await apiJson<{ assets: Asset[]; nextCursor: string | null }>(
+          `/assets?${queryString}${cursorPart}`
+        );
+        all.push(...data.assets);
+        if (!data.nextCursor) break;
+        cursor = data.nextCursor;
+      }
+      return all;
+    });
   }
 
   function onSubmit(e: FormEvent) {
@@ -122,6 +144,7 @@ export function SearchPage() {
         </section>
       )}
 
+      {error && <p className="error-text">{error}</p>}
       {results && <PhotoGrid assets={results} />}
       {results && results.length === 0 && <p>Keine Treffer für „{query}“.</p>}
     </div>

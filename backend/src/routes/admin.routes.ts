@@ -6,6 +6,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { BadRequest, Conflict, NotFound } from "../utils/httpError.js";
 import { getGitStatus, pullAndRestart } from "../services/git.service.js";
 import { enqueueMlPipeline, mlQueue } from "../queues/mlQueue.js";
+import { backupStream, deleteBackup, listBackups, runBackup } from "../services/backup.service.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -13,8 +14,8 @@ adminRouter.use(requireAuth, requireAdmin);
 adminRouter.get("/stats", async (_req, res) => {
   const [userCount, assetCount, storage] = await Promise.all([
     prisma.user.count(),
-    prisma.asset.count(),
-    prisma.asset.aggregate({ _sum: { size: true } }),
+    prisma.asset.count({ where: { deletedAt: null } }),
+    prisma.asset.aggregate({ where: { deletedAt: null }, _sum: { size: true } }),
   ]);
 
   res.json({
@@ -61,12 +62,21 @@ adminRouter.delete("/users/:userId", async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.params.userId } });
   if (!user) throw NotFound("User not found");
 
-  await prisma.user.delete({ where: { id: user.id } });
+  // shared_links.created_by is ON DELETE RESTRICT in the schema, so any user
+  // who ever created a share link could not be deleted at all (500). Remove
+  // those links explicitly in the same transaction as the user.
+  await prisma.$transaction([
+    prisma.sharedLink.deleteMany({ where: { createdBy: user.id } }),
+    prisma.user.delete({ where: { id: user.id } }),
+  ]);
   res.status(204).send();
 });
 
 adminRouter.post("/ml/rescan", async (_req, res) => {
-  const assets = await prisma.asset.findMany({ select: { id: true, userId: true, path: true } });
+  const assets = await prisma.asset.findMany({
+    where: { deletedAt: null },
+    select: { id: true, userId: true, path: true },
+  });
 
   await Promise.all(
     assets.map((asset) =>
@@ -89,4 +99,29 @@ adminRouter.get("/git-status", async (_req, res) => {
 adminRouter.post("/git-update", async (_req, res) => {
   const result = await pullAndRestart();
   res.status(result.success ? 200 : 500).json(result);
+});
+
+// ── Database backups ─────────────────────────────────────────────────────────
+
+adminRouter.get("/backups", (_req, res) => {
+  res.json(listBackups());
+});
+
+adminRouter.post("/backups", async (_req, res) => {
+  const filename = await runBackup();
+  res.status(201).json({ filename });
+});
+
+adminRouter.get("/backups/:filename", (req, res) => {
+  const stream = backupStream(req.params.filename);
+  if (!stream) throw NotFound("Backup not found");
+  res.setHeader("Content-Type", "application/gzip");
+  res.setHeader("Content-Disposition", `attachment; filename="${req.params.filename}"`);
+  stream.pipe(res);
+});
+
+adminRouter.delete("/backups/:filename", (req, res) => {
+  const ok = deleteBackup(req.params.filename);
+  if (!ok) throw NotFound("Backup not found");
+  res.status(204).send();
 });

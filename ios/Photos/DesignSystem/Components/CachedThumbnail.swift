@@ -19,8 +19,8 @@ struct CachedThumbnail: View {
                 Rectangle().fill(.quaternary)
             }
         }
-        .task(id: assetId) {
-            guard let url else { return }
+        .task(id: ThumbnailKey(assetId: assetId, revision: AssetChanges.shared.revision(for: assetId))) {
+            guard let url = AssetChanges.shared.versionedURL(url, assetId: assetId) else { return }
             image = await ImageCache.shared.fetch(assetId: assetId, url: url)
         }
     }

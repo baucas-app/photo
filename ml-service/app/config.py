@@ -11,7 +11,7 @@ def resolve_path(relative_path: str) -> str:
     read-only here, and every path the backend sends is already relative
     to it (e.g. "/2024/Urlaub/photo1.jpg").
     """
-    normalized = os.path.normpath(relative_path).lstrip("./")
+    normalized = os.path.normpath(relative_path).removeprefix("./")
     if not normalized.startswith("/"):
         normalized = "/" + normalized
     absolute = os.path.normpath(STORAGE_ROOT + normalized)

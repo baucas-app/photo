@@ -1,4 +1,11 @@
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL ?? "http://localhost:8000";
+const ML_INTERNAL_KEY = process.env.ML_INTERNAL_KEY ?? "";
+// A hung ml-service call (container restarting, model load stuck, ...) used
+// to block a BullMQ worker slot forever - concurrency is only 2, so two
+// stuck jobs stalled the whole pipeline for every user. Generous default
+// since a cold model load on constrained NAS hardware can genuinely take a
+// while; overridable via env for slower setups.
+const ML_SERVICE_TIMEOUT_MS = Number(process.env.ML_SERVICE_TIMEOUT_MS ?? 60_000);
 
 /**
  * Thin HTTP client for the ml-service container. Both backend and ml-service
@@ -25,17 +32,33 @@ export interface DetectedFace {
 }
 
 async function post<T>(endpoint: string, body: unknown): Promise<T> {
-  const response = await fetch(`${ML_SERVICE_URL}${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ML_SERVICE_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`ml-service ${endpoint} failed: ${response.status} ${await response.text()}`);
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (ML_INTERNAL_KEY) headers["X-Internal-Key"] = ML_INTERNAL_KEY;
+
+    const response = await fetch(`${ML_SERVICE_URL}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`ml-service ${endpoint} failed: ${response.status} ${await response.text()}`);
+    }
+
+    return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`ml-service ${endpoint} timed out after ${ML_SERVICE_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return (await response.json()) as T;
 }
 
 export function getClipEmbedding(relativePath: string): Promise<ClipEmbeddingResult> {
@@ -52,4 +75,8 @@ export function detectObjects(relativePath: string): Promise<{ objects: Detected
 
 export function detectFaces(relativePath: string): Promise<{ faces: DetectedFace[] }> {
   return post<{ faces: DetectedFace[] }>("/detect/faces", { path: relativePath });
+}
+
+export function extractOcrText(relativePath: string): Promise<{ text: string }> {
+  return post<{ text: string }>("/ocr", { path: relativePath });
 }

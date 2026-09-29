@@ -31,24 +31,59 @@ enum ShareRole {
   viewer
 }
 
+enum AlbumSortOrder {
+  takenAt_desc
+  takenAt_asc
+  uploadedAt_desc
+  name_asc
+}
+
+enum LibraryShareStatus {
+  pending
+  accepted
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
-  passwordHash String   @map("password_hash")
+  passwordHash String?  @map("password_hash")
   name         String?
   role         Role     @default(user)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  assets        Asset[]
-  albums        Album[]
-  faces         Face[]
-  sharedLinks   SharedLink[]
-  sharedMembers SharedMember[]
-  backupStatus  BackupStatus?
-  apiKeys       ApiKey[]
+  assets           Asset[]
+  albums           Album[]
+  faces            Face[]
+  sharedLinks      SharedLink[]
+  sharedMembers    SharedMember[]
+  backupStatus     BackupStatus?
+  apiKeys          ApiKey[]
+  albumComments    AlbumComment[]
+  librarySentTo    LibraryShare[] @relation("LibraryShareFrom")
+  libraryReceivedFrom LibraryShare[] @relation("LibraryShareTo")
+  devicePushTokens DevicePushToken[]
+  smartAlbums      SmartAlbum[]
+  tagGroups        TagGroup[]
+  userLabels       UserLabel[]
+  oauthAccounts    OAuthAccount[]
+  trips            Trip[]
 
   @@map("users")
+}
+
+model OAuthAccount {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  provider   String
+  providerId String   @map("provider_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("oauth_accounts")
 }
 
 model Asset {
@@ -73,6 +108,30 @@ model Asset {
   hash       String?
   isFavorite Boolean   @default(false) @map("is_favorite")
   isArchived Boolean   @default(false) @map("is_archived")
+  deletedAt  DateTime? @map("deleted_at")
+  latitude   Float?
+  longitude  Float?
+  locationCity    String? @map("location_city")
+  locationCountry String? @map("location_country")
+  is360           Boolean @default(false) @map("is_360")
+  ocrText         String? @map("ocr_text")
+
+  /// Stacks (burst shots / manual "group as one card"): a child points at its
+  /// stack's primary asset; the primary itself has stackParentId = null.
+  /// Listing endpoints filter stackParentId: null so children only show up
+  /// nested under the primary, never as separate timeline entries.
+  stackParentId String? @map("stack_parent_id")
+  stackParent   Asset?  @relation("Stack", fields: [stackParentId], references: [id], onDelete: SetNull)
+  stackChildren Asset[] @relation("Stack")
+
+  /// Live Photos / Motion Photos: the still image points at its paired video
+  /// component. The video row itself is marked isLivePhotoMotion so listing
+  /// endpoints hide it too - it's not a photo/video the user browses on its
+  /// own, only ever reached through the still it belongs to.
+  isLivePhotoMotion Boolean @default(false) @map("is_live_photo_motion")
+  livePhotoVideoId  String? @unique @map("live_photo_video_id")
+  livePhotoVideo    Asset?  @relation("LivePhoto", fields: [livePhotoVideoId], references: [id], onDelete: SetNull)
+  livePhotoOf       Asset?  @relation("LivePhoto")
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   albumAssets    AlbumAsset[]
@@ -81,10 +140,16 @@ model Asset {
   coverOfAlbums  Album[]         @relation("AlbumCover")
   sampleOfFaces  Face[]          @relation("FaceSample")
   embedding      AssetEmbedding?
+  assetLabels    AssetLabel[]
+  tripAssets     TripAsset[]
+  coverOfTrips   Trip[]          @relation("TripCover")
 
   @@index([userId])
   @@index([takenAt])
   @@index([hash])
+  @@index([deletedAt])
+  @@index([latitude, longitude])
+  @@index([stackParentId])
   @@map("assets")
 }
 
@@ -112,6 +177,10 @@ model Album {
   path          String
   parentId      String?  @map("parent_id")
   coverAssetId  String?  @map("cover_asset_id")
+  pinned            Boolean  @default(false)
+  sortOrder         AlbumSortOrder @default(takenAt_desc) @map("sort_order")
+  isLocked          Boolean  @default(false) @map("is_locked")
+  lockPasswordHash  String?  @map("lock_password_hash")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -122,6 +191,7 @@ model Album {
   albumAssets   AlbumAsset[]
   sharedLink    SharedLink?
   sharedMembers SharedMember[]
+  comments      AlbumComment[]
 
   @@unique([userId, path])
   @@index([parentId])
@@ -235,6 +305,164 @@ model ApiKey {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("api_keys")
+}
+
+model AlbumComment {
+  id        String   @id @default(uuid())
+  albumId   String   @map("album_id")
+  userId    String   @map("user_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([albumId])
+  @@map("album_comments")
+}
+
+/// Bidirectional "share your whole library" invite between two users.
+/// fromUser invites toUser; toUser must accept before either side can see
+/// the other's assets via GET /partner/assets.
+model LibraryShare {
+  id         String             @id @default(uuid())
+  fromUserId String             @map("from_user_id")
+  toUserId   String             @map("to_user_id")
+  status     LibraryShareStatus @default(pending)
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  fromUser User @relation("LibraryShareFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("LibraryShareTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@map("library_shares")
+}
+
+/// APNs push token per device. One user can have multiple devices.
+model DevicePushToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String   @default("ios")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_push_tokens")
+}
+
+/// Dynamisch befülltes Album auf Basis gespeicherter Suchregeln.
+/// rules: Array von {field, op, value} – z.B. [{field:"tag",op:"eq",value:"Strand"}].
+/// Unterstützte Felder: tag, cameraModel, takenAfter, takenBefore,
+/// isFavorite, locationCity, locationCountry, ocrContains.
+model SmartAlbum {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  rules     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("smart_albums")
+}
+
+/// Nutzerdefinierte Tag-Gruppe (= hierarchische/semantische Gruppierung von Labels).
+/// Beispiel: Gruppe "Reisen" enthält Labels ["Strand","Meer","Palme","Urlaub"].
+model TagGroup {
+  id        String          @id @default(uuid())
+  userId    String          @map("user_id")
+  name      String
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labels TagGroupLabel[]
+
+  @@index([userId])
+  @@map("tag_groups")
+}
+
+model TagGroupLabel {
+  id         String   @id @default(uuid())
+  tagGroupId String   @map("tag_group_id")
+  label      String
+
+  tagGroup TagGroup @relation(fields: [tagGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([tagGroupId, label])
+  @@map("tag_group_labels")
+}
+
+/// User-created labels with optional parent for hierarchy (e.g. Natur > Tiere > Hund).
+/// Distinct from Tag (YOLO/auto-detection per asset).
+model UserLabel {
+  id        String       @id @default(uuid())
+  userId    String       @map("user_id")
+  name      String
+  color     String?
+  parentId  String?      @map("parent_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      UserLabel?   @relation("LabelTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    UserLabel[]  @relation("LabelTree")
+  assetLabels AssetLabel[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@map("user_labels")
+}
+
+model AssetLabel {
+  assetId    String   @map("asset_id")
+  labelId    String   @map("label_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  asset  Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label  UserLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, labelId])
+  @@index([assetId])
+  @@index([labelId])
+  @@map("asset_labels")
+}
+
+model Trip {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  name         String
+  startDate    DateTime @map("start_date")
+  endDate      DateTime @map("end_date")
+  centerLat    Float?   @map("center_lat")
+  centerLon    Float?   @map("center_lon")
+  locationName String?  @map("location_name")
+  coverAssetId String?  @map("cover_asset_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coverAsset Asset?      @relation("TripCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  assets     TripAsset[]
+
+  @@index([userId])
+  @@index([startDate])
+  @@map("trips")
+}
+
+model TripAsset {
+  tripId  String @map("trip_id")
+  assetId String @map("asset_id")
+
+  trip  Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([tripId, assetId])
+  @@map("trip_assets")
 }
 
 model BackupStatus {

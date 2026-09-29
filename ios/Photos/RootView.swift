@@ -10,6 +10,9 @@ struct RootView: View {
     // top of it so the standard back button lets people return and change
     // the server address - including on later launches, not just the first.
     @State private var path: [SetupRoute] = ServerConfig.baseURL != nil ? [.login] : []
+    // Credentials survive going back to fix the server URL.
+    @State private var pendingEmail = ""
+    @State private var pendingPassword = ""
 
     var body: some View {
         Group {
@@ -19,11 +22,11 @@ struct RootView: View {
                 MainTabView()
             } else {
                 NavigationStack(path: $path) {
-                    ServerSetupView { path = [.login] }
+                    ServerSetupView { _ in path = [.login] }
                         .navigationDestination(for: SetupRoute.self) { route in
                             switch route {
                             case .login:
-                                LoginView()
+                                LoginView(email: $pendingEmail, password: $pendingPassword)
                             }
                         }
                 }
@@ -41,9 +44,6 @@ struct MainTabView: View {
             }
             Tab("Alben", systemImage: "rectangle.stack") {
                 AlbumsView()
-            }
-            Tab("Suche", systemImage: "magnifyingglass") {
-                SearchView()
             }
             Tab("Personen", systemImage: "person.crop.circle") {
                 FacesView()

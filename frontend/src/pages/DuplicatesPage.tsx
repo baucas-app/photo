@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "../api/client";
 import { imageUrl } from "../api/apiKey";
+import { moveToTrash } from "../api/assets";
 
 interface DuplicateAsset {
   id: string;
@@ -31,8 +32,8 @@ export function DuplicatesPage() {
     void reload();
   }, []);
 
-  async function deleteAsset(id: string) {
-    await apiJson(`/assets/${id}`, { method: "DELETE" });
+  async function trashAsset(id: string) {
+    await moveToTrash(id);
     await reload();
   }
 
@@ -43,7 +44,8 @@ export function DuplicatesPage() {
       <h2>Duplikate</h2>
       <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
         Erkannt über Perceptual Hash - findet auch unterschiedlich große/komprimierte Kopien desselben Fotos, nicht
-        nur byteidentische Dateien.
+        nur byteidentische Dateien. Aussortierte Kopien landen im Papierkorb und lassen sich dort 30 Tage lang
+        wiederherstellen.
       </p>
 
       {groups.length === 0 && <p>Keine Duplikate gefunden.</p>}
@@ -62,8 +64,13 @@ export function DuplicatesPage() {
                 </figure>
                 <div style={{ fontSize: 12, marginTop: 4 }}>{asset.filename}</div>
                 <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{formatBytes(asset.size)}</div>
-                <button className="btn danger" style={{ marginTop: 4, width: "100%" }} onClick={() => deleteAsset(asset.id)}>
-                  Löschen
+                <button
+                  className="btn danger"
+                  style={{ marginTop: 4, width: "100%" }}
+                  onClick={() => trashAsset(asset.id)}
+                  title="Kann 30 Tage lang aus dem Papierkorb wiederhergestellt werden"
+                >
+                  In den Papierkorb
                 </button>
               </div>
             ))}

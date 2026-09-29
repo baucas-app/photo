@@ -78,6 +78,38 @@ async function loadValidSharedLink(token: string, password?: string) {
   return link;
 }
 
+/**
+ * The fields an anonymous visitor of a public share link may see. The full
+ * Asset row (used internally by resolvePublicAsset for file serving) also
+ * carries the server filesystem path and the owner's internal user id -
+ * neither belongs in a response anyone with the link can read.
+ */
+function toPublicAsset(asset: {
+  id: string;
+  filename: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  takenAt: Date | null;
+  is360: boolean;
+  isLivePhotoMotion: boolean;
+  livePhotoVideoId: string | null;
+}) {
+  return {
+    id: asset.id,
+    filename: asset.filename,
+    mimeType: asset.mimeType,
+    width: asset.width,
+    height: asset.height,
+    duration: asset.duration,
+    takenAt: asset.takenAt,
+    is360: asset.is360,
+    isLivePhotoMotion: asset.isLivePhotoMotion,
+    livePhotoVideoId: asset.livePhotoVideoId,
+  };
+}
+
 export async function resolvePublicAlbum(token: string, password?: string) {
   const link = await loadValidSharedLink(token, password);
 
@@ -87,7 +119,7 @@ export async function resolvePublicAlbum(token: string, password?: string) {
       name: link.album.name,
       description: link.album.description,
     },
-    assets: link.album.albumAssets.map((entry) => entry.asset),
+    assets: link.album.albumAssets.map((entry) => toPublicAsset(entry.asset)),
   };
 }
 

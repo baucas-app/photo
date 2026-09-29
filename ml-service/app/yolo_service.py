@@ -1,8 +1,13 @@
+import threading
 from functools import lru_cache
 
 from ultralytics import YOLO
 
 from .config import YOLO_MODEL_NAME
+
+# Ultralytics models/predictors are not thread-safe, and FastAPI runs sync
+# endpoints concurrently in a threadpool. Serialize loading and inference.
+_lock = threading.Lock()
 
 
 @lru_cache(maxsize=1)
@@ -13,8 +18,9 @@ def _load() -> YOLO:
 
 
 def detect_objects(absolute_path: str) -> list[dict]:
-    model = _load()
-    results = model(absolute_path, verbose=False)[0]
+    with _lock:
+        model = _load()
+        results = model(absolute_path, verbose=False)[0]
 
     objects = []
     for box in results.boxes:

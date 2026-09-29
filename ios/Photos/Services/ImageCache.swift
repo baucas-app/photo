@@ -31,6 +31,12 @@ actor ImageCache {
         try? data.write(to: diskDirectory.appendingPathComponent(assetId))
     }
 
+    /// Drops a stale thumbnail (e.g. after the photo was edited or deleted).
+    func remove(assetId: String) {
+        memoryCache.removeObject(forKey: assetId as NSString)
+        try? FileManager.default.removeItem(at: diskDirectory.appendingPathComponent(assetId))
+    }
+
     func fetch(assetId: String, url: URL) async -> UIImage? {
         if let cached = image(for: assetId) { return cached }
         guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }

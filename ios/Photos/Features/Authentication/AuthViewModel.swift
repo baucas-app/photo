@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import UIKit
 
@@ -31,7 +32,12 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    func login(email: String, password: String) async {
+    /// Returns whether this specific call succeeded - callers that present
+    /// login/register inside a sheet (adding a second account) need that to
+    /// decide whether to dismiss, since `currentUser` alone can't tell them:
+    /// it's already non-nil from the account they're adding *to*.
+    @discardableResult
+    func login(email: String, password: String) async -> Bool {
         errorMessage = nil
         do {
             struct Body: Encodable { let email: String; let password: String }
@@ -39,12 +45,15 @@ final class AuthViewModel: ObservableObject {
                 "/auth/login", method: "POST", body: Body(email: email, password: password), authenticated: false
             )
             persist(response)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
-    func register(email: String, password: String, name: String?) async {
+    @discardableResult
+    func register(email: String, password: String, name: String?) async -> Bool {
         errorMessage = nil
         do {
             struct Body: Encodable { let email: String; let password: String; let name: String? }
@@ -53,14 +62,17 @@ final class AuthViewModel: ObservableObject {
                 authenticated: false
             )
             persist(response)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
     /// Signs out of the active account entirely: removes its tokens and its
     /// entry in the account switcher. To just step away and add a different
-    /// account without losing this one, use `addAccount()` instead.
+    /// account without losing this one, use the "Weiteres Konto hinzufügen"
+    /// sheet (`AddAccountFlow`, from SettingsView) instead.
     func logout() {
         guard let accountId = AccountsStore.activeAccountId else {
             currentUser = nil
@@ -68,14 +80,6 @@ final class AuthViewModel: ObservableObject {
         }
         AccountsStore.remove(accountId)
         savedAccounts = AccountsStore.accounts
-        currentUser = nil
-    }
-
-    /// Leaves the current account's credentials untouched but clears the
-    /// active session, so RootView falls back to the server/login flow for
-    /// a second account. Switch back via `switchAccount`.
-    func addAccount() {
-        AccountsStore.activeAccountId = nil
         currentUser = nil
     }
 
@@ -92,6 +96,80 @@ final class AuthViewModel: ObservableObject {
         savedAccounts = AccountsStore.accounts
         if AccountsStore.activeAccountId == nil {
             currentUser = nil
+        }
+    }
+
+    // MARK: - OAuth – Apple Sign In
+
+    @discardableResult
+    func loginWithApple(credential: ASAuthorizationAppleIDCredential) async -> Bool {
+        errorMessage = nil
+        guard let tokenData = credential.identityToken,
+              let identityToken = String(data: tokenData, encoding: .utf8) else {
+            errorMessage = "Apple Sign In: Kein Identity Token erhalten."
+            return false
+        }
+        let email = credential.email
+        let fullName = credential.fullName
+        let name: String? = [fullName?.givenName, fullName?.familyName]
+            .compactMap { $0 }.joined(separator: " ").nonEmpty
+
+        do {
+            struct Body: Encodable { let identityToken: String; let email: String?; let name: String? }
+            let response: AuthResponse = try await APIClient.shared.request(
+                "/auth/oauth/apple/token", method: "POST",
+                body: Body(identityToken: identityToken, email: email, name: name),
+                authenticated: false
+            )
+            persist(response)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - OAuth – Google (ASWebAuthenticationSession)
+
+    @discardableResult
+    func loginWithGoogle(presentationAnchor: ASPresentationAnchor) async -> Bool {
+        errorMessage = nil
+        guard let base = ServerConfig.baseURL else {
+            errorMessage = "Kein Server konfiguriert."
+            return false
+        }
+        let url = URL(string: "\(base)/api/auth/oauth/google?platform=ios")!
+        return await withCheckedContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: url, callbackURLScheme: "photosapp"
+            ) { [weak self] callbackURL, error in
+                guard let self else { continuation.resume(returning: false); return }
+                guard let callbackURL, error == nil else {
+                    // User cancelled or error – not a hard failure
+                    continuation.resume(returning: false)
+                    return
+                }
+                let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)
+                func param(_ name: String) -> String? {
+                    components?.queryItems?.first(where: { $0.name == name })?.value
+                }
+                guard let accessToken = param("accessToken"),
+                      let refreshToken = param("refreshToken"),
+                      let userId = param("userId"),
+                      let email = param("email") else {
+                    self.errorMessage = "Google-Anmeldung: Ungültige Antwort."
+                    continuation.resume(returning: false)
+                    return
+                }
+                let name = param("name")?.nonEmpty
+                let user = User(id: userId, email: email, name: name, role: .user)
+                let fakeResponse = AuthResponse(user: user, accessToken: accessToken, refreshToken: refreshToken)
+                self.persist(fakeResponse)
+                continuation.resume(returning: true)
+            }
+            session.presentationContextProvider = PresentationAnchorProvider(anchor: presentationAnchor)
+            session.prefersEphemeralWebBrowserSession = false
+            session.start()
         }
     }
 
@@ -118,4 +196,15 @@ final class AuthViewModel: ObservableObject {
         ) else { return }
         KeychainStore.set(created.key, for: .apiKey, account: account)
     }
+}
+
+// Adapts a UIWindow to ASWebAuthenticationPresentationContextProviding.
+private final class PresentationAnchorProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private let anchor: ASPresentationAnchor
+    init(anchor: ASPresentationAnchor) { self.anchor = anchor }
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor { anchor }
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
 }

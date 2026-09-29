@@ -8,6 +8,12 @@ final class TimelineViewModel: ObservableObject {
 
     private var nextCursor: String?
     private var reachedEnd = false
+    /// Extra query items, e.g. `archived=true` for the archive screen.
+    private let filter: [URLQueryItem]
+
+    init(filter: [URLQueryItem] = []) {
+        self.filter = filter
+    }
 
     func loadInitial() async {
         assets = []
@@ -22,14 +28,23 @@ final class TimelineViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let query = nextCursor.map { "?cursor=\($0)" } ?? ""
-            let page: AssetPage = try await APIClient.shared.request("/assets\(query)")
+            var items = filter
+            if let nextCursor { items.append(URLQueryItem(name: "cursor", value: nextCursor)) }
+            var components = URLComponents()
+            components.queryItems = items.isEmpty ? nil : items
+            let page: AssetPage = try await APIClient.shared.request("/assets\(components.string ?? "")")
             assets.append(contentsOf: page.assets)
             nextCursor = page.nextCursor
             reachedEnd = page.nextCursor == nil
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Drops assets that were archived / moved to the trash elsewhere in the
+    /// app, without reloading (keeps the scroll position).
+    func removeAssets(in ids: Set<String>) {
+        assets.removeAll { ids.contains($0.id) }
     }
 
     func loadMoreIfNeeded(current asset: Asset) async {

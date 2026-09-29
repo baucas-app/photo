@@ -24,7 +24,7 @@ export interface DuplicateGroup {
  */
 export async function findDuplicates(userId: string): Promise<DuplicateGroup[]> {
   const assets = await prisma.asset.findMany({
-    where: { userId, hash: { not: null }, isArchived: false },
+    where: { userId, hash: { not: null }, isArchived: false, deletedAt: null, stackParentId: null, isLivePhotoMotion: false },
     select: { id: true, filename: true, path: true, size: true, takenAt: true, uploadedAt: true, hash: true },
     orderBy: { uploadedAt: "asc" },
   });

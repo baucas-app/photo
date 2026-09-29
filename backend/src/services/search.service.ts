@@ -2,27 +2,43 @@ import { bufferToFloats, cosineSimilarity, getClipTextEmbedding } from "@photos/
 import { prisma } from "../db/prisma.js";
 
 /**
- * Brute-force cosine similarity over every embedding the user owns. Fine for
- * a personal library (thousands of photos); if this ever needs to scale to
- * shared multi-tenant libraries, move the vectors into pgvector and let
- * Postgres do the nearest-neighbour search instead.
+ * Combined search: semantic CLIP similarity + OCR full-text match.
+ * OCR results are merged in with a fixed score of 0.7 so they rank below
+ * strong semantic matches but above weak ones (typical CLIP threshold ~0.2).
+ * Brute-force is fine for a personal library; move to pgvector if it grows.
  */
 export async function semanticSearch(userId: string, query: string, limit = 60) {
+  const baseFilter = { userId, deletedAt: null, stackParentId: null, isLivePhotoMotion: false, isArchived: false };
+
+  const [embeddings, ocrMatches] = await Promise.all([
+    prisma.assetEmbedding.findMany({
+      where: { asset: baseFilter },
+      include: { asset: true },
+    }),
+    prisma.asset.findMany({
+      where: { ...baseFilter, ocrText: { contains: query, mode: "insensitive" } },
+    }),
+  ]);
+
   const { embedding: queryVector } = await getClipTextEmbedding(query);
 
-  const embeddings = await prisma.assetEmbedding.findMany({
-    where: { asset: { userId } },
-    include: { asset: true },
-  });
+  const seenIds = new Set<string>();
+  const results: { asset: (typeof embeddings)[0]["asset"]; score: number }[] = [];
 
-  const scored = embeddings
-    .map((entry) => ({
-      asset: entry.asset,
-      score: cosineSimilarity(queryVector, bufferToFloats(entry.vector)),
-    }))
-    .filter((entry) => !entry.asset.isArchived)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  // Semantic results first (sorted by score)
+  for (const entry of embeddings
+    .map((e) => ({ asset: e.asset, score: cosineSimilarity(queryVector, bufferToFloats(e.vector)) }))
+    .sort((a, b) => b.score - a.score)) {
+    seenIds.add(entry.asset.id);
+    results.push(entry);
+  }
 
-  return scored;
+  // OCR results: insert with score 0.7 (above weak semantic, below strong semantic)
+  for (const asset of ocrMatches) {
+    if (!seenIds.has(asset.id)) {
+      results.push({ asset, score: 0.7 });
+    }
+  }
+
+  return results.sort((a, b) => b.score - a.score).slice(0, limit);
 }

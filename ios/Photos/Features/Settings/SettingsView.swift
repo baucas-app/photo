@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var apiKeys: [ApiKeyInfo] = []
     @State private var isServerOnline: Bool?
     @State private var latencyMs: Int?
+    @State private var isAddingAccount = false
 
     var body: some View {
         NavigationStack {
@@ -57,7 +58,7 @@ struct SettingsView: View {
                             Button("Entfernen", role: .destructive) { auth.removeAccount(account) }
                         }
                     }
-                    Button("Weiteres Konto hinzufügen") { auth.addAccount() }
+                    Button("Weiteres Konto hinzufügen") { isAddingAccount = true }
                 }
 
                 Section("Server-Status") {
@@ -76,13 +77,14 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink("Freigaben") { SharingView() }
+                    NavigationLink("Partner-Freigabe") { PartnerView() }
                 }
 
                 Section("API-Keys") {
                     ForEach(apiKeys) { key in
                         VStack(alignment: .leading) {
                             Text(key.name)
-                            Text("Erstellt \(key.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                            Text("Erstellt \(key.createdAt.formatted(date: .abbreviated, time: .shortened))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -108,6 +110,12 @@ struct SettingsView: View {
             .task {
                 await loadApiKeys()
                 await checkHealth()
+            }
+            .sheet(isPresented: $isAddingAccount) {
+                AddAccountFlow(
+                    previousServerURL: ServerConfig.baseURL,
+                    previousActiveAccountId: AccountsStore.activeAccountId
+                )
             }
         }
     }

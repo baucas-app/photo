@@ -19,6 +19,11 @@ export function SharingPage() {
   async function createLink() {
     if (!selectedAlbum) return;
     setError(null);
+    if (password && password.length < 4) {
+      // Backend rejects < 4 chars with a generic "Validation failed".
+      setError("Das Passwort muss mindestens 4 Zeichen lang sein");
+      return;
+    }
     try {
       await apiJson(`/albums/${selectedAlbum}/share`, {
         method: "POST",

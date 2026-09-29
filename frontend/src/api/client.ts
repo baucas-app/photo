@@ -19,6 +19,9 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
+/** Fired on window when the session can't be refreshed any more. */
+export const AUTH_EXPIRED_EVENT = "photos:auth-expired";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -39,6 +42,7 @@ async function refreshAccessToken(): Promise<string | null> {
   });
   if (!response.ok) {
     clearTokens();
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     return null;
   }
 

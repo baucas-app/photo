@@ -51,17 +51,28 @@ facesRouter.get("/:faceId/assets", async (req, res) => {
   if (!face) throw NotFound("Face not found");
 
   const query = listQuerySchema.parse(req.query);
-  const detections = await prisma.faceDetection.findMany({
-    where: { faceId: face.id },
-    include: { asset: true },
-    distinct: ["assetId"],
-    orderBy: { asset: { takenAt: "desc" } },
+  // Was previously a FaceDetection query with `distinct: ["assetId"]` (one
+  // person can be detected more than once in the same photo) - Postgres'
+  // DISTINCT ON requires the ORDER BY to start with the distinct columns,
+  // which doesn't compose reliably with Prisma's cursor/skip pagination and
+  // could duplicate or skip assets across pages. Querying Asset directly via
+  // the relation filter sidesteps that entirely: each matching asset can
+  // only appear once, no `distinct` needed.
+  const assets = await prisma.asset.findMany({
+    where: {
+      userId: req.user!.sub,
+      deletedAt: null,
+      stackParentId: null,
+      isLivePhotoMotion: false,
+      faceDetections: { some: { faceId: face.id } },
+    },
+    orderBy: [{ takenAt: "desc" }, { id: "desc" }],
     take: query.limit,
     ...(query.cursor ? { skip: 1, cursor: { id: query.cursor } } : {}),
   });
 
   res.json({
-    assets: detections.map((d) => d.asset),
-    nextCursor: detections.length === query.limit ? detections.at(-1)?.id ?? null : null,
+    assets,
+    nextCursor: assets.length === query.limit ? assets.at(-1)?.id ?? null : null,
   });
 });

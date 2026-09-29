@@ -1,8 +1,19 @@
 import face_recognition
+import numpy as np
+from PIL import Image, ImageOps
+
+
+def _load_upright_rgb(absolute_path: str) -> np.ndarray:
+    # face_recognition.load_image_file ignores EXIF orientation: rotated phone
+    # photos then yield no faces (HOG expects upright faces) and bounding boxes
+    # in the wrong coordinate system compared to what the frontend displays.
+    with Image.open(absolute_path) as raw:
+        image = ImageOps.exif_transpose(raw).convert("RGB")
+    return np.array(image)
 
 
 def detect_faces(absolute_path: str) -> list[dict]:
-    image = face_recognition.load_image_file(absolute_path)
+    image = _load_upright_rgb(absolute_path)
     locations = face_recognition.face_locations(image)
     encodings = face_recognition.face_encodings(image, known_face_locations=locations)
 

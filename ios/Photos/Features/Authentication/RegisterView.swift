@@ -4,6 +4,10 @@ struct RegisterView: View {
     @EnvironmentObject private var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
+    /// See LoginView.candidateServerURL - same deferred-commit reasoning,
+    /// passed through when RegisterView is reached from inside AddAccountFlow.
+    var candidateServerURL: URL? = nil
+
     @State private var name = ""
     @State private var email = ""
     @State private var password = ""
@@ -32,9 +36,12 @@ struct RegisterView: View {
                     Button {
                         Task {
                             isSubmitting = true
-                            await auth.register(email: email, password: password, name: name.isEmpty ? nil : name)
+                            if let candidateServerURL { ServerConfig.baseURL = candidateServerURL }
+                            let success = await auth.register(
+                                email: email, password: password, name: name.isEmpty ? nil : name
+                            )
                             isSubmitting = false
-                            if auth.currentUser != nil { dismiss() }
+                            if success { dismiss() }
                         }
                     } label: {
                         if isSubmitting { ProgressView() } else { Text("Erstellen") }
